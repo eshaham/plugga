@@ -29,6 +29,9 @@
     "developer-tools",
     "typescript"
   ],
+  "files": [
+    "dist"
+  ],
   "author": "",
   "license": "MIT",
   "engines": {
