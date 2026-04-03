@@ -42,6 +42,7 @@ const InitFlow: React.FC = () => {
   const [accounts, setAccounts] = useState<OpAccount[]>([]);
   const [vaults, setVaults] = useState<OpVault[]>([]);
   const [selectedAccount, setSelectedAccount] = useState('');
+  const [selectedEmail, setSelectedEmail] = useState('');
   const [selectedVault, setSelectedVault] = useState('');
   const [profileName, setProfileName] = useState('');
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
@@ -105,6 +106,10 @@ const InitFlow: React.FC = () => {
 
   const handleAccountSelect = async (item: ListItem) => {
     setSelectedAccount(item.value);
+    const account = accounts.find((a) => a.url === item.value);
+    if (account) {
+      setSelectedEmail(account.email);
+    }
     setCompletedSteps((prev) => [...prev, `Selected account: ${item.label}`]);
 
     const vaultsResult = await exec('op', [
@@ -223,12 +228,13 @@ const InitFlow: React.FC = () => {
   ];
 
   const defaultProfileName =
-    selectedAccount.replace('.1password.com', '').replace(/[^a-z0-9-]/g, '') ||
-    'default';
+    selectedEmail.split('@')[0]?.replace(/[^a-z0-9-]/g, '') || 'default';
 
   return (
-    <Box flexDirection="column" gap={1}>
-      <Text bold>Plugga Init</Text>
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text bold>Plugga Init</Text>
+      </Box>
 
       {completedSteps.map((step, i) => (
         <StatusMessage key={i} status="success" message={step} />
