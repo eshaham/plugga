@@ -15,6 +15,7 @@ import {
   handleRecipesShow,
 } from '~/commands/recipes';
 import { handleSecretsGet, handleSecretsSet } from '~/commands/secrets';
+import { handleSetup } from '~/commands/setup';
 import { handleVariablesGet, handleVariablesSet } from '~/commands/variables';
 import { createOnePasswordStore } from '~/secrets/one-password-store';
 
@@ -127,6 +128,22 @@ variables
       service: opts.service as string,
       account: opts.account as string | undefined,
     })
+  );
+
+program
+  .command('setup <recipe>')
+  .description('Set up a recipe in the current project')
+  .option('--account <account>', 'Account name (uses default if omitted)')
+  .option('--project-dir <dir>', 'Project directory', process.cwd())
+  .action((recipeName: string, opts) =>
+    handleSetup(
+      {
+        recipe: recipeName,
+        account: opts.account as string | undefined,
+        projectDir: opts.projectDir as string,
+      },
+      store
+    )
   );
 
 const accountsCmd = program
