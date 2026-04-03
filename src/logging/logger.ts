@@ -1,12 +1,7 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-function getLogDir(): string {
-  const xdgConfigHome = process.env['XDG_CONFIG_HOME'];
-  const base = xdgConfigHome ?? join(homedir(), '.config');
-  return join(base, 'plugga', 'logs');
-}
+import { getLogDir } from '~/config/paths';
 
 function getLogFilePath(): string {
   return join(getLogDir(), 'plugga.log');
@@ -28,7 +23,7 @@ function formatLogLine(
   return parts.join(' ') + '\n';
 }
 
-async function ensureLogDir(): Promise<void> {
+async function ensureLogDirectory(): Promise<void> {
   await mkdir(getLogDir(), { recursive: true });
 }
 
@@ -38,7 +33,7 @@ async function writeLog(
   details?: Record<string, unknown>
 ): Promise<void> {
   try {
-    await ensureLogDir();
+    await ensureLogDirectory();
     const line = formatLogLine(level, action, details);
     await appendFile(getLogFilePath(), line, 'utf-8');
   } catch {
