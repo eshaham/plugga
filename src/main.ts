@@ -2,6 +2,11 @@
 
 import { Command } from 'commander';
 
+import {
+  handleAccountsRename,
+  handleAccountsSetDefault,
+  handleAccountsShow,
+} from '~/commands/accounts';
 import { handleLogs } from '~/commands/logs';
 import { handleSecretsGet, handleSecretsSet } from '~/commands/secrets';
 import { handleVariablesGet, handleVariablesSet } from '~/commands/variables';
@@ -83,6 +88,36 @@ variables
     handleVariablesGet({
       service: opts.service as string,
       account: opts.account as string | undefined,
+    })
+  );
+
+const accountsCmd = program
+  .command('accounts')
+  .description('Manage accounts for services');
+
+accountsCmd
+  .command('show <service>')
+  .description('Show default account for a service')
+  .action((service: string) => handleAccountsShow(service));
+
+accountsCmd
+  .command('set-default <service> <account>')
+  .description('Set the default account for a service')
+  .action((service: string, account: string) =>
+    handleAccountsSetDefault({ service, account })
+  );
+
+accountsCmd
+  .command('rename')
+  .description('Rename an account for a service')
+  .requiredOption('--service <service>', 'Service name')
+  .requiredOption('--old-name <oldName>', 'Current account name')
+  .requiredOption('--new-name <newName>', 'New account name')
+  .action((opts) =>
+    handleAccountsRename({
+      service: opts.service as string,
+      oldName: opts.oldName as string,
+      newName: opts.newName as string,
     })
   );
 
