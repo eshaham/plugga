@@ -100,6 +100,14 @@ Sets up a recipe in the current project:
 4. Write secrets as environment variables to `.env`
 5. Warn if `.env` is not in `.gitignore`
 
+**Multi-account setup**: Running setup again with a different `--account` adds to existing configuration:
+
+- MCP: creates a separate server entry named `<recipe>-<account>` (renames the first entry too)
+- Skill context.md: regenerated listing all configured accounts with per-account sections
+- Skill .env: single account uses clean names (`GOOGLE_MAPS_API_KEY`), multi-account suffixes all (`GOOGLE_MAPS_API_KEY_PERSONAL`, `GOOGLE_MAPS_API_KEY_ACME`)
+
+Setup state is tracked in `.claude/plugga.json` per project.
+
 ### Logs
 
 ```bash
