@@ -8,7 +8,16 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   sourcemap: true,
-  external: ['commander'],
+  external: [
+    'commander',
+    'ink',
+    'ink-select-input',
+    'ink-text-input',
+    'ink-spinner',
+    'react',
+    'react/jsx-runtime',
+    'dotenv',
+  ],
   esbuildOptions(options) {
     options.alias = {
       '~': path.resolve('./src'),
