@@ -206,6 +206,26 @@ Skill recipes can include a `SKILL.md` file alongside `recipe.json` with markdow
       SKILL.md         # Skill content (skill type only)
 ```
 
+## Project Output
+
+When `plugga setup` runs, it produces files in your project:
+
+```
+<project>/
+  .claude/
+    settings.local.json   # MCP server entries (for MCP recipes)
+    plugga.json           # Tracks which accounts are set up per recipe
+    skills/
+      <recipe>/
+        SKILL.md          # Copied from recipe (for skill recipes)
+        context.md        # Generated with account, variables, secrets
+  .env                    # Secret values as env vars (for skill recipes)
+```
+
+## Plugga Meta-Skill
+
+During `plugga init`, you can install a global skill to `~/.claude/skills/plugga/SKILL.md`. This teaches Claude about plugga so it can help you manage integrations, create recipes, and run setup commands.
+
 ## 1Password Integration
 
 Plugga uses the 1Password CLI (`op`) to store and retrieve secrets:
