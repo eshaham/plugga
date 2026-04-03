@@ -9,6 +9,11 @@ import {
 } from '~/commands/accounts';
 import { handleInit } from '~/commands/init';
 import { handleLogs } from '~/commands/logs';
+import {
+  handleRecipesAdd,
+  handleRecipesList,
+  handleRecipesShow,
+} from '~/commands/recipes';
 import { handleSecretsGet, handleSecretsSet } from '~/commands/secrets';
 import { handleVariablesGet, handleVariablesSet } from '~/commands/variables';
 import { createOnePasswordStore } from '~/secrets/one-password-store';
@@ -28,6 +33,33 @@ program
   .command('init')
   .description('Initialize Plugga and configure 1Password profile')
   .action(() => handleInit());
+
+const recipes = program.command('recipes').description('Manage recipes');
+
+recipes
+  .command('list')
+  .description('List all available recipes')
+  .action(() => handleRecipesList());
+
+recipes
+  .command('add <name>')
+  .description('Add a new recipe')
+  .requiredOption('--type <type>', 'Recipe type: mcp or skill')
+  .requiredOption('--service <service>', 'Service name')
+  .requiredOption('--description <description>', 'Recipe description')
+  .action((name: string, opts) =>
+    handleRecipesAdd({
+      name,
+      type: opts.type as 'mcp' | 'skill',
+      service: opts.service as string,
+      description: opts.description as string,
+    })
+  );
+
+recipes
+  .command('show <name>')
+  .description('Show recipe details')
+  .action((name: string) => handleRecipesShow(name));
 
 const secrets = program.command('secrets').description('Manage secrets');
 
