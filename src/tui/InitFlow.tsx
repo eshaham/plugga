@@ -15,6 +15,7 @@ import { TextPrompt } from './components/TextPrompt';
 type Phase =
   | 'check-op'
   | 'select-account'
+  | 'loading-vaults'
   | 'select-vault'
   | 'create-vault'
   | 'profile-name'
@@ -104,38 +105,52 @@ const InitFlow: React.FC = () => {
     });
   }, [phase]);
 
-  const handleAccountSelect = async (item: ListItem) => {
+  const handleAccountSelect = (item: ListItem) => {
     setSelectedAccount(item.value);
     const account = accounts.find((a) => a.url === item.value);
     if (account) {
       setSelectedEmail(account.email);
     }
     setCompletedSteps((prev) => [...prev, `Selected account: ${item.label}`]);
+    setPhase('loading-vaults');
+  };
 
-    const vaultsResult = await exec('op', [
-      'vault',
-      'list',
-      '--account',
-      item.value,
-      '--format',
-      'json',
-    ]);
-
-    if (vaultsResult.exitCode !== 0) {
-      setErrorMessage('Failed to list vaults.');
-      setPhase('error');
+  useEffect(() => {
+    if (phase !== 'loading-vaults') {
       return;
     }
 
-    try {
-      const parsed = JSON.parse(vaultsResult.stdout) as OpVault[];
-      setVaults(parsed);
-      setPhase('select-vault');
-    } catch {
-      setErrorMessage('Failed to parse vaults.');
+    const fetchVaults = async () => {
+      const vaultsResult = await exec('op', [
+        'vault',
+        'list',
+        '--account',
+        selectedAccount,
+        '--format',
+        'json',
+      ]);
+
+      if (vaultsResult.exitCode !== 0) {
+        setErrorMessage('Failed to list vaults.');
+        setPhase('error');
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(vaultsResult.stdout) as OpVault[];
+        setVaults(parsed);
+        setPhase('select-vault');
+      } catch {
+        setErrorMessage('Failed to parse vaults.');
+        setPhase('error');
+      }
+    };
+
+    fetchVaults().catch((e) => {
+      setErrorMessage(String(e));
       setPhase('error');
-    }
-  };
+    });
+  }, [phase, selectedAccount]);
 
   const handleVaultSelect = (item: ListItem) => {
     if (item.value === '__create__') {
@@ -250,6 +265,10 @@ const InitFlow: React.FC = () => {
           items={accountItems}
           onSelect={handleAccountSelect}
         />
+      )}
+
+      {phase === 'loading-vaults' && (
+        <StatusMessage status="loading" message="Loading vaults..." />
       )}
 
       {phase === 'select-vault' && (
