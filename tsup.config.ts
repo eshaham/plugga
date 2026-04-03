@@ -23,7 +23,4 @@ export default defineConfig({
       '~': path.resolve('./src'),
     };
   },
-  banner: {
-    js: '#!/usr/bin/env node',
-  },
 });
