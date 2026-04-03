@@ -18,7 +18,6 @@ type Phase =
   | 'loading-vaults'
   | 'select-vault'
   | 'create-vault'
-  | 'profile-name'
   | 'configure-tag'
   | 'install-skill'
   | 'done'
@@ -43,9 +42,8 @@ const InitFlow: React.FC = () => {
   const [accounts, setAccounts] = useState<OpAccount[]>([]);
   const [vaults, setVaults] = useState<OpVault[]>([]);
   const [selectedAccount, setSelectedAccount] = useState('');
-  const [selectedEmail, setSelectedEmail] = useState('');
   const [selectedVault, setSelectedVault] = useState('');
-  const [profileName, setProfileName] = useState('');
+  const profileName = 'default';
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
 
   useEffect(() => {
@@ -107,10 +105,6 @@ const InitFlow: React.FC = () => {
 
   const handleAccountSelect = (item: ListItem) => {
     setSelectedAccount(item.value);
-    const account = accounts.find((a) => a.url === item.value);
-    if (account) {
-      setSelectedEmail(account.email);
-    }
     setCompletedSteps((prev) => [...prev, `Selected account: ${item.label}`]);
     setPhase('loading-vaults');
   };
@@ -159,7 +153,7 @@ const InitFlow: React.FC = () => {
     }
     setSelectedVault(item.value);
     setCompletedSteps((prev) => [...prev, `Selected vault: ${item.label}`]);
-    setPhase('profile-name');
+    setPhase('configure-tag');
   };
 
   const handleCreateVault = async (name: string) => {
@@ -179,12 +173,6 @@ const InitFlow: React.FC = () => {
 
     setSelectedVault(name);
     setCompletedSteps((prev) => [...prev, `Created vault: ${name}`]);
-    setPhase('profile-name');
-  };
-
-  const handleProfileName = (name: string) => {
-    setProfileName(name);
-    setCompletedSteps((prev) => [...prev, `Profile name: ${name}`]);
     setPhase('configure-tag');
   };
 
@@ -242,9 +230,6 @@ const InitFlow: React.FC = () => {
     { label: '+ Create new vault', value: '__create__' },
   ];
 
-  const defaultProfileName =
-    selectedEmail.split('@')[0]?.replace(/[^a-z0-9-]/g, '') || 'default';
-
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
@@ -284,14 +269,6 @@ const InitFlow: React.FC = () => {
           label="New vault name"
           defaultValue="plugga"
           onSubmit={handleCreateVault}
-        />
-      )}
-
-      {phase === 'profile-name' && (
-        <TextPrompt
-          label="Profile name"
-          defaultValue={defaultProfileName}
-          onSubmit={handleProfileName}
         />
       )}
 
