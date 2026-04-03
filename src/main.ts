@@ -4,6 +4,7 @@ import { Command } from 'commander';
 
 import { handleLogs } from '~/commands/logs';
 import { handleSecretsGet, handleSecretsSet } from '~/commands/secrets';
+import { handleVariablesGet, handleVariablesSet } from '~/commands/variables';
 import { createOnePasswordStore } from '~/secrets/one-password-store';
 
 const store = createOnePasswordStore();
@@ -53,6 +54,36 @@ secrets
       },
       store
     )
+  );
+
+const variables = program.command('variables').description('Manage variables');
+
+variables
+  .command('set')
+  .description('Store a variable for a service and account')
+  .requiredOption('--service <service>', 'Service name')
+  .requiredOption('--account <account>', 'Account name')
+  .requiredOption('--name <name>', 'Variable name')
+  .requiredOption('--value <value>', 'Variable value')
+  .action((opts) =>
+    handleVariablesSet({
+      service: opts.service as string,
+      account: opts.account as string,
+      name: opts.name as string,
+      value: opts.value as string,
+    })
+  );
+
+variables
+  .command('get')
+  .description('Retrieve variables for a service and account')
+  .requiredOption('--service <service>', 'Service name')
+  .option('--account <account>', 'Account name (uses default if omitted)')
+  .action((opts) =>
+    handleVariablesGet({
+      service: opts.service as string,
+      account: opts.account as string | undefined,
+    })
   );
 
 program
