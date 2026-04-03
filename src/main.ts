@@ -7,6 +7,7 @@ import {
   handleAccountsSetDefault,
   handleAccountsShow,
 } from '~/commands/accounts';
+import { handleInit } from '~/commands/init';
 import { handleLogs } from '~/commands/logs';
 import { handleSecretsGet, handleSecretsSet } from '~/commands/secrets';
 import { handleVariablesGet, handleVariablesSet } from '~/commands/variables';
@@ -22,6 +23,11 @@ program
     'Centralized CLI for managing service integrations and secrets across projects'
   )
   .version('0.1.0');
+
+program
+  .command('init')
+  .description('Initialize Plugga and configure 1Password profile')
+  .action(() => handleInit());
 
 const secrets = program.command('secrets').description('Manage secrets');
 
