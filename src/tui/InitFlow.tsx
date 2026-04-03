@@ -19,6 +19,7 @@ type Phase =
   | 'select-vault'
   | 'create-vault'
   | 'configure-tag'
+  | 'enter-tag-name'
   | 'install-skill'
   | 'done'
   | 'error';
@@ -176,11 +177,32 @@ const InitFlow: React.FC = () => {
     setPhase('configure-tag');
   };
 
-  const handleTagConfirm = async (useDefault: boolean) => {
-    if (!useDefault) {
+  const handleTagConfirm = (wantsTag: boolean) => {
+    if (wantsTag) {
+      setPhase('enter-tag-name');
+    } else {
+      saveProfileAndContinue('').catch((e) => {
+        setErrorMessage(String(e));
+        setPhase('error');
+      });
+    }
+  };
+
+  const handleTagName = (tag: string) => {
+    saveProfileAndContinue(tag).catch((e) => {
+      setErrorMessage(String(e));
+      setPhase('error');
+    });
+  };
+
+  const saveProfileAndContinue = async (tag: string) => {
+    if (tag) {
       const config = await loadConfig();
-      config.tag = 'plugga';
+      config.tag = tag;
       await saveConfig(config);
+      setCompletedSteps((prev) => [...prev, `Tag: ${tag}`]);
+    } else {
+      setCompletedSteps((prev) => [...prev, 'No tag configured']);
     }
 
     await addProfile(profileName, {
@@ -274,8 +296,16 @@ const InitFlow: React.FC = () => {
 
       {phase === 'configure-tag' && (
         <Confirm
-          label='Use default tag "plugga" for 1Password items?'
+          label="Tag 1Password items created by plugga?"
           onConfirm={handleTagConfirm}
+        />
+      )}
+
+      {phase === 'enter-tag-name' && (
+        <TextPrompt
+          label="Tag name"
+          defaultValue="plugga"
+          onSubmit={handleTagName}
         />
       )}
 
