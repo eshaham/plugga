@@ -419,6 +419,13 @@ describe('handleSetup', () => {
       const consoleSpy = jest.spyOn(console, 'error');
       const store = createMockStore();
 
+      mockLoadRecipe.mockResolvedValue({
+        name: 'test-mcp',
+        service: 'test',
+        type: 'mcp',
+        description: 'test',
+        mcp: { transport: 'stdio', command: 'echo' },
+      } as McpRecipe);
       mockResolveAccount.mockRejectedValue(new Error('No account specified'));
       mockLogError.mockResolvedValue(undefined);
 

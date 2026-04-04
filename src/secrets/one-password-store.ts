@@ -127,6 +127,7 @@ function createOnePasswordStore(): SecretsStore {
         account,
         '--fields',
         `label=${ref.key}`,
+        '--reveal',
       ]);
 
       if (result.exitCode !== 0) {

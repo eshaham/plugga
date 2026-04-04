@@ -329,8 +329,8 @@ async function handleSetup(
   store: SecretsStore
 ): Promise<void> {
   try {
-    const account = await resolveAccount(input.recipe, input.account);
     const recipe = await loadRecipe(input.recipe);
+    const account = await resolveAccount(recipe.service, input.account);
     const secrets = await resolveSecrets(recipe, account, store);
 
     const state = await loadProjectState(input.projectDir);
