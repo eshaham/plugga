@@ -1,4 +1,3 @@
-import { parse } from 'dotenv';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -56,14 +55,6 @@ async function readJsonFile(path: string): Promise<Record<string, unknown>> {
   } catch {
     return {};
   }
-}
-
-function stringifyEnv(env: Record<string, string>): string {
-  return (
-    Object.entries(env)
-      .map(([key, value]) => `${key}=${value}`)
-      .join('\n') + '\n'
-  );
 }
 
 function suffixEnvVar(envVar: string, account: string): string {
@@ -210,16 +201,9 @@ async function setupSkill(
     );
     const isMultiAccount = allAccounts.length > 1;
 
-    const envPath = resolve(projectDir, '.env');
-    let existing = '';
-
-    try {
-      existing = await readFile(envPath, 'utf-8');
-    } catch {
-      // file doesn't exist yet
-    }
-
-    const env = parse(existing);
+    const settingsPath = resolve(projectDir, '.claude', 'settings.local.json');
+    const settings = await readJsonFile(settingsPath);
+    const env = (settings['env'] as Record<string, string>) ?? {};
 
     if (isMultiAccount && existingAccounts.length === 1) {
       const firstAccount = existingAccounts[0] ?? '';
@@ -246,8 +230,13 @@ async function setupSkill(
       }
     }
 
-    await writeFile(envPath, stringifyEnv(env), 'utf-8');
-    console.log('Wrote secrets to .env');
+    settings['env'] = env;
+    await writeFile(
+      settingsPath,
+      JSON.stringify(settings, null, 2) + '\n',
+      'utf-8'
+    );
+    console.log('Wrote secrets to .claude/settings.local.json env');
   }
 }
 
@@ -287,7 +276,7 @@ async function generateContextFile(
         isMultiAccount ? '\n#### Secrets\n' : '\n### Secrets\n'
       );
       contextLines.push(
-        'Secrets are available as environment variables in `.env`:'
+        'Secrets are available as environment variables via `.claude/settings.local.json` `env` field:'
       );
       for (const secret of recipe.secrets ?? []) {
         if (secret.envVar) {
@@ -312,14 +301,14 @@ async function checkGitignore(projectDir: string): Promise<void> {
   const gitignorePath = resolve(projectDir, '.gitignore');
   try {
     const content = await readFile(gitignorePath, 'utf-8');
-    if (!content.includes('.env')) {
+    if (!content.includes('settings.local.json')) {
       console.warn(
-        'Warning: .env is not in .gitignore. Consider adding it to avoid committing secrets.'
+        'Warning: settings.local.json is not in .gitignore. Consider adding .claude/settings.local.json to avoid committing secrets.'
       );
     }
   } catch {
     console.warn(
-      'Warning: No .gitignore found. Consider creating one with .env to avoid committing secrets.'
+      'Warning: No .gitignore found. Consider adding .claude/settings.local.json to avoid committing secrets.'
     );
   }
 }
@@ -363,10 +352,7 @@ async function handleSetup(
     const updatedState = addRecipeAccount(state, input.recipe, account);
     await saveProjectState(input.projectDir, updatedState);
 
-    const hasEnvSecrets = (recipe.secrets ?? []).some((s) => s.envVar);
-    if (hasEnvSecrets && recipe.type === 'skill') {
-      await checkGitignore(input.projectDir);
-    }
+    await checkGitignore(input.projectDir);
 
     console.log(`Setup complete for ${input.recipe}/${account}`);
     await logInfo('setup', {

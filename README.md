@@ -97,14 +97,14 @@ Sets up a recipe in the current project:
 1. Check if the recipe's CLI tool is installed (with install hints if missing)
 2. Copy `SKILL.md` to `.claude/skills/<recipe>/SKILL.md`
 3. Generate `.claude/skills/<recipe>/context.md` with account-specific variables and secret mappings
-4. Write secrets as environment variables to `.env`
-5. Warn if `.env` is not in `.gitignore`
+4. Write secrets as environment variables to `.claude/settings.local.json` `env` field (automatically available in shell)
+5. Warn if `settings.local.json` is not in `.gitignore`
 
 **Multi-account setup**: Running setup again with a different `--account` adds to existing configuration:
 
 - MCP: creates a separate server entry named `<recipe>-<account>` (renames the first entry too)
 - Skill context.md: regenerated listing all configured accounts with per-account sections
-- Skill .env: single account uses clean names (`MY_API_KEY`), multi-account suffixes all (`MY_API_KEY_PERSONAL`, `MY_API_KEY_ACME`)
+- Skill env vars: single account uses clean names (`MY_API_KEY`), multi-account suffixes all (`MY_API_KEY_PERSONAL`, `MY_API_KEY_ACME`)
 
 Setup state is tracked in `.claude/plugga.json` per project.
 
@@ -213,13 +213,12 @@ When `plugga setup` runs, it produces files in your project:
 ```
 <project>/
   .claude/
-    settings.local.json   # MCP server entries (for MCP recipes)
+    settings.local.json   # MCP server entries + env vars for secrets
     plugga.json           # Tracks which accounts are set up per recipe
     skills/
       <recipe>/
         SKILL.md          # Copied from recipe (for skill recipes)
         context.md        # Generated with account, variables, secrets
-  .env                    # Secret values as env vars (for skill recipes)
 ```
 
 ## Plugga Meta-Skill

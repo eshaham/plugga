@@ -260,7 +260,7 @@ describe('handleSetup', () => {
       expect(contextContent).toContain('`GITHUB_TOKEN`');
     });
 
-    it('should write .env with secret env vars', async () => {
+    it('should write env vars to settings.local.json', async () => {
       const recipe = makeSkillRecipe();
       const store = createMockStore({
         'github/myaccount/api-key': 'secret123',
@@ -272,8 +272,9 @@ describe('handleSetup', () => {
 
       await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
 
-      const envContent = await readFile(resolve(tempDir, '.env'), 'utf-8');
-      expect(envContent).toContain('GITHUB_TOKEN=secret123');
+      const settings = await readSettings();
+      const env = settings['env'] as Record<string, string>;
+      expect(env['GITHUB_TOKEN']).toBe('secret123');
     });
   });
 
@@ -316,10 +317,11 @@ describe('handleSetup', () => {
       mockResolveAccount.mockResolvedValue('acct2');
       await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
 
-      const envContent = await readFile(resolve(tempDir, '.env'), 'utf-8');
-      expect(envContent).toContain('GITHUB_TOKEN_ACCT1=secret1');
-      expect(envContent).toContain('GITHUB_TOKEN_ACCT2=secret2');
-      expect(envContent).not.toMatch(/^GITHUB_TOKEN=/m);
+      const settings = await readSettings();
+      const env = settings['env'] as Record<string, string>;
+      expect(env['GITHUB_TOKEN_ACCT1']).toBe('secret1');
+      expect(env['GITHUB_TOKEN_ACCT2']).toBe('secret2');
+      expect(env['GITHUB_TOKEN']).toBeUndefined();
     });
   });
 
@@ -345,7 +347,7 @@ describe('handleSetup', () => {
   });
 
   describe('.gitignore warning', () => {
-    it('should warn when .env not in .gitignore', async () => {
+    it('should warn when settings.local.json not in .gitignore', async () => {
       const consoleSpy = jest.spyOn(console, 'warn');
       const recipe = makeSkillRecipe();
       const store = createMockStore({
@@ -364,7 +366,7 @@ describe('handleSetup', () => {
       await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('.env is not in .gitignore')
+        expect.stringContaining('settings.local.json is not in .gitignore')
       );
     });
 
@@ -386,7 +388,7 @@ describe('handleSetup', () => {
       );
     });
 
-    it('should not warn when .env is in .gitignore', async () => {
+    it('should not warn when settings.local.json is in .gitignore', async () => {
       const consoleSpy = jest.spyOn(console, 'warn');
       const recipe = makeSkillRecipe();
       const store = createMockStore({
@@ -399,7 +401,7 @@ describe('handleSetup', () => {
 
       await writeFile(
         resolve(tempDir, '.gitignore'),
-        '.env\nnode_modules\n',
+        '.claude/settings.local.json\nnode_modules\n',
         'utf-8'
       );
       await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
@@ -407,7 +409,7 @@ describe('handleSetup', () => {
       const envWarnings = consoleSpy.mock.calls.filter(
         (call) =>
           typeof call[0] === 'string' &&
-          (call[0].includes('.env is not in .gitignore') ||
+          (call[0].includes('settings.local.json is not in .gitignore') ||
             call[0].includes('No .gitignore found'))
       );
       expect(envWarnings).toHaveLength(0);

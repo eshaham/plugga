@@ -16,11 +16,13 @@ export default defineConfig({
     'ink-spinner',
     'react',
     'react/jsx-runtime',
-    'dotenv',
   ],
   esbuildOptions(options) {
     options.alias = {
       '~': path.resolve('./src'),
     };
+  },
+  loader: {
+    '.md': 'text',
   },
 });
