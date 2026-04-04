@@ -8,6 +8,7 @@ import {
   handleAccountsShow,
 } from '~/commands/accounts';
 import { handleInit } from '~/commands/init';
+import { handleInstallSkill } from '~/commands/install-skill';
 import { handleLogs } from '~/commands/logs';
 import {
   handleRecipesAdd,
@@ -175,6 +176,11 @@ accountsCmd
       newName: opts.newName as string,
     })
   );
+
+program
+  .command('install-skill')
+  .description('Install or update the plugga skill globally')
+  .action(() => handleInstallSkill());
 
 program
   .command('logs')

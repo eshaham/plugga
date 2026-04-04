@@ -35,6 +35,14 @@ plugga init
 
 Interactive setup: selects 1Password account, vault, creates a profile, and optionally installs this skill globally.
 
+### Install or Update Skill
+
+\`\`\`bash
+plugga install-skill
+\`\`\`
+
+Non-interactive command that installs or updates this skill at \`~/.claude/skills/plugga/SKILL.md\`. Run this after updating plugga to get the latest skill content.
+
 ### Manage Recipes
 
 \`\`\`bash
