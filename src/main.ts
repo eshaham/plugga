@@ -46,13 +46,13 @@ recipes
   .command('add <name>')
   .description('Add a new recipe')
   .requiredOption('--type <type>', 'Recipe type: mcp or skill')
-  .requiredOption('--service <service>', 'Service name')
+  .option('--service <service>', 'Service name (defaults to recipe name)')
   .requiredOption('--description <description>', 'Recipe description')
   .action((name: string, opts) =>
     handleRecipesAdd({
       name,
       type: opts.type as 'mcp' | 'skill',
-      service: opts.service as string,
+      service: (opts.service as string | undefined) ?? name,
       description: opts.description as string,
     })
   );

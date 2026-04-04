@@ -39,8 +39,8 @@ plugga init                     # Configure 1Password profile, install meta-skil
 plugga recipes list             # List all recipes
 plugga recipes add <name> \
   --type <mcp|skill> \
-  --service <service> \
-  --description <desc>          # Create a new recipe
+  [--service <service>] \
+  --description <desc>          # Create a new recipe (service defaults to name)
 plugga recipes show <name>      # Show recipe details as JSON
 ```
 

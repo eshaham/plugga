@@ -39,7 +39,7 @@ Interactive setup: selects 1Password account, vault, creates a profile, and opti
 
 \`\`\`bash
 plugga recipes list
-plugga recipes add <name> --type <mcp|skill> --service <service> --description <desc>
+plugga recipes add <name> --type <mcp|skill> [--service <service>] --description <desc>
 plugga recipes show <name>
 \`\`\`
 
@@ -182,7 +182,7 @@ Setup state is tracked in \`.claude/plugga.json\` per project.
 - Services are shared namespaces. Multiple recipes can reference the same service (e.g., a \`linear\` MCP recipe and a \`linear-cli\` skill recipe both use secrets from the \`linear\` service).
 - When the user asks to set up a new integration, check if a recipe already exists with \`plugga recipes list\`. If not, help them create one.
 - Always ask the user which account to use if they have multiple accounts for a service and no default is set.
-- When creating recipes, ask the user what type of integration they want (MCP or skill) and what secrets/variables the service requires.
+- When creating recipes, ask the user what type of integration they want (MCP or skill) and what secrets/variables the service requires. The \`--service\` flag defaults to the recipe name, so omit it unless the service name differs from the recipe name (e.g., when two recipes share one service).
 - Secrets are set one at a time: \`plugga secrets set --service <s> --account <a> --name <n> --value <v>\`.
 - If a setup fails due to a missing secret, guide the user to set it first with \`plugga secrets set\`.
 
