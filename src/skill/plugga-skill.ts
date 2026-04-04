@@ -185,7 +185,13 @@ The only files you should edit directly are:
 - \`~/.config/plugga/recipes/<name>/recipe.json\` — to add \`secrets\`, \`variables\`, and \`cli\` fields after \`plugga recipes add\` creates the skeleton.
 - \`~/.config/plugga/recipes/<name>/SKILL.md\` — skill instructions (must be created manually).
 
-- When the user asks to set up a new integration, check if a recipe already exists with \`plugga recipes list\`. If not, create one with \`plugga recipes add\`, then edit the generated recipe.json to add \`secrets\`, \`variables\`, and \`cli\` fields.
+**Before doing anything, check existing state.** When the user asks to set up an integration:
+1. Run \`plugga recipes list\` to see if a recipe already exists.
+2. If it exists, run \`plugga recipes show <name>\` to see its current configuration.
+3. Run \`plugga secrets get --service <s> --account <a>\` to check if secrets are already stored.
+4. Only create or configure what is missing — do not recreate things that already exist.
+
+- For new recipes, create with \`plugga recipes add\`, then edit the generated recipe.json to add \`secrets\`, \`variables\`, and \`cli\` fields.
 - For skill recipes, you MUST create a \`SKILL.md\` file at \`~/.config/plugga/recipes/<name>/SKILL.md\`. This is required — \`plugga setup\` will fail without it.
 - Services are shared namespaces. Multiple recipes can reference the same service (e.g., an MCP recipe and a skill recipe for the same tool can share credentials by using the same \`service\` value).
 - Always ask the user which account to use if they have multiple accounts for a service and no default is set.
