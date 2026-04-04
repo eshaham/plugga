@@ -179,12 +179,14 @@ Setup state is tracked in \`.claude/plugga.json\` per project.
 
 ## Important Notes for Claude
 
-**Always use plugga CLI commands for secrets, variables, accounts, and setup. Never edit config.json, accounts.json, or variables.json directly.**
+**Always use plugga CLI commands for secrets, variables, accounts, and setup. Never edit plugga config files directly.**
 
-Recipe files (recipe.json and SKILL.md) are the exception — these are meant to be edited directly since the CLI only creates a skeleton.
+The only files you should edit directly are:
+- \`~/.config/plugga/recipes/<name>/recipe.json\` — to add \`secrets\`, \`variables\`, and \`cli\` fields after \`plugga recipes add\` creates the skeleton.
+- \`~/.config/plugga/recipes/<name>/SKILL.md\` — skill instructions (must be created manually).
 
 - When the user asks to set up a new integration, check if a recipe already exists with \`plugga recipes list\`. If not, create one with \`plugga recipes add\`, then edit the generated recipe.json to add \`secrets\`, \`variables\`, and \`cli\` fields.
-- For skill recipes, you MUST also create a \`SKILL.md\` file at \`~/.config/plugga/recipes/<name>/SKILL.md\`. This file contains the markdown instructions that get copied into projects during setup. Without it, \`plugga setup\` will warn and skip skill installation.
+- For skill recipes, you MUST create a \`SKILL.md\` file at \`~/.config/plugga/recipes/<name>/SKILL.md\`. This is required — \`plugga setup\` will fail without it.
 - Services are shared namespaces. Multiple recipes can reference the same service (e.g., an MCP recipe and a skill recipe for the same tool can share credentials by using the same \`service\` value).
 - Always ask the user which account to use if they have multiple accounts for a service and no default is set.
 - The \`--service\` flag defaults to the recipe name, so omit it unless the service name differs from the recipe name (e.g., when two recipes share one service).

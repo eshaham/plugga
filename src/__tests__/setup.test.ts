@@ -436,5 +436,23 @@ describe('handleSetup', () => {
       );
       expect(mockLogError).toHaveBeenCalled();
     });
+
+    it('should fail if skill recipe has no SKILL.md', async () => {
+      const consoleSpy = jest.spyOn(console, 'error');
+      const recipe = makeSkillRecipe();
+      const store = createMockStore({
+        'github/myaccount/api-key': 'secret123',
+      });
+
+      mockLoadRecipe.mockResolvedValue(recipe);
+      mockResolveAccount.mockResolvedValue('myaccount');
+      mockLoadSkillContent.mockResolvedValue(undefined);
+
+      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('SKILL.md is required')
+      );
+    });
   });
 });

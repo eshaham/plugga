@@ -187,21 +187,21 @@ async function setupSkill(
   }
 
   const skillContent = await loadSkillContent(recipe.name);
-  if (skillContent) {
-    const skillDir = resolve(projectDir, '.claude', 'skills', recipe.name);
-    await mkdir(skillDir, { recursive: true });
-    await writeFile(resolve(skillDir, 'SKILL.md'), skillContent, 'utf-8');
-    console.log(`Installed skill to .claude/skills/${recipe.name}/SKILL.md`);
-
-    const allAccounts = [...existingAccounts, account].filter(
-      (a, i, arr) => arr.indexOf(a) === i
-    );
-    await generateContextFile(recipe, allAccounts, skillDir);
-  } else {
-    console.warn(
-      `No SKILL.md found for recipe "${recipe.name}". Create one at ~/.config/plugga/recipes/${recipe.name}/SKILL.md`
+  if (!skillContent) {
+    throw new Error(
+      `SKILL.md is required for skill recipe "${recipe.name}". Create it at ~/.config/plugga/recipes/${recipe.name}/SKILL.md`
     );
   }
+
+  const skillDir = resolve(projectDir, '.claude', 'skills', recipe.name);
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(resolve(skillDir, 'SKILL.md'), skillContent, 'utf-8');
+  console.log(`Installed skill to .claude/skills/${recipe.name}/SKILL.md`);
+
+  const allAccounts = [...existingAccounts, account].filter(
+    (a, i, arr) => arr.indexOf(a) === i
+  );
+  await generateContextFile(recipe, allAccounts, skillDir);
 
   const secretsWithEnvVars = (recipe.secrets ?? []).filter((s) => s.envVar);
   if (secretsWithEnvVars.length > 0) {

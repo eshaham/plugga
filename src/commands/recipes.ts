@@ -58,7 +58,9 @@ async function handleRecipesAdd(input: AddRecipeInput): Promise<void> {
     `Edit ${recipeDir}/recipe.json to configure secrets and settings.`
   );
   if (input.type === 'skill') {
-    console.log(`Create ${recipeDir}/SKILL.md with instructions for Claude.`);
+    console.log(
+      `\nIMPORTANT: Create ${recipeDir}/SKILL.md with instructions for Claude. This file is required — setup will fail without it.`
+    );
   }
   await logInfo('recipes.add', { name: input.name, type: input.type });
 }
