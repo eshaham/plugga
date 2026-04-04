@@ -191,7 +191,7 @@ Setup state is tracked in \`.claude/plugga.json\` per project.
 
 The only files you should edit directly are:
 - \`~/.config/plugga/recipes/<name>/recipe.json\` — to add \`secrets\`, \`variables\`, and \`cli\` fields after \`plugga recipes add\` creates the skeleton.
-- \`~/.config/plugga/recipes/<name>/SKILL.md\` — skill instructions (must be created manually).
+- \`~/.config/plugga/recipes/<name>/SKILL.md\` — skill instructions (must be created manually). See "Writing SKILL.md" below for content guidelines.
 
 **Before doing anything, check existing state.** When the user asks to set up an integration:
 1. Run \`plugga recipes list\` to see if a recipe already exists.
@@ -206,6 +206,32 @@ The only files you should edit directly are:
 - The \`--service\` flag defaults to the recipe name, so omit it unless the service name differs from the recipe name (e.g., when two recipes share one service).
 - Secrets are set one at a time: \`plugga secrets set --service <s> --account <a> --name <n> --value <v>\`.
 - If a setup fails due to a missing secret, guide the user to set it first with \`plugga secrets set\`.
+
+## Writing SKILL.md
+
+SKILL.md files should be short, generic, and portable. They get copied into every project that uses the recipe, so they must not contain project-specific details.
+
+**Do:**
+- A one-line description of what the tool does.
+- A link to the CLI tool's README or documentation (e.g., \`See: https://github.com/example/tool#readme\`).
+- The env var name where the API key is available (from \`.env\`).
+
+**Do not:**
+- Include usage examples, command references, or tutorials — the CLI's own \`--help\` and README are the source of truth.
+- Reference specific projects, directories, or use cases.
+- Make assumptions about what the tool can do beyond what its documentation says.
+
+Example SKILL.md:
+
+\`\`\`markdown
+# My Tool
+
+CLI for interacting with the Example API.
+
+API key is available as \`MY_TOOL_API_KEY\` in \`.env\`.
+
+See: https://github.com/example/my-tool#readme
+\`\`\`
 
 ## File Locations
 
