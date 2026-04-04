@@ -94,12 +94,11 @@ Recipes are stored in \`~/.config/plugga/recipes/<name>/\`:
 
 \`\`\`json
 {
-  "name": "linear",
-  "service": "linear",
+  "name": "my-service",
   "type": "mcp",
-  "description": "Linear MCP server",
-  "secrets": [{ "name": "api-key", "envVar": "LINEAR_API_KEY" }],
-  "mcp": { "transport": "stdio", "command": "npx", "args": ["@anthropic/linear-mcp"] }
+  "description": "My MCP server",
+  "secrets": [{ "name": "api-key", "envVar": "MY_SERVICE_API_KEY" }],
+  "mcp": { "transport": "stdio", "command": "npx", "args": ["@example/my-mcp"] }
 }
 \`\`\`
 
@@ -107,25 +106,27 @@ Recipes are stored in \`~/.config/plugga/recipes/<name>/\`:
 
 \`\`\`json
 {
-  "name": "linear-hosted",
-  "service": "linear",
+  "name": "my-service-hosted",
+  "service": "my-service",
   "type": "mcp",
-  "description": "Linear hosted MCP",
+  "description": "My hosted MCP",
   "secrets": [{ "name": "api-key", "header": "Authorization", "headerPrefix": "Bearer " }],
-  "mcp": { "transport": "sse", "url": "https://mcp.linear.app/sse" }
+  "mcp": { "transport": "sse", "url": "https://mcp.example.com/sse" }
 }
 \`\`\`
+
+Note: \`service\` is only needed when it differs from the recipe name (here \`my-service-hosted\` shares the \`my-service\` credential namespace).
 
 **http** — Connects via HTTP. Supports static headers merged with secret-based headers.
 
 \`\`\`json
 {
-  "name": "linear-http",
-  "service": "linear",
+  "name": "my-service-http",
+  "service": "my-service",
   "type": "mcp",
-  "description": "Linear HTTP MCP",
+  "description": "My HTTP MCP",
   "secrets": [{ "name": "api-key", "header": "Authorization", "headerPrefix": "Bearer " }],
-  "mcp": { "transport": "http", "url": "https://mcp.linear.app", "headers": { "X-Workspace": "default" } }
+  "mcp": { "transport": "http", "url": "https://mcp.example.com", "headers": { "X-Custom": "value" } }
 }
 \`\`\`
 
@@ -133,16 +134,15 @@ Recipes are stored in \`~/.config/plugga/recipes/<name>/\`:
 
 \`\`\`json
 {
-  "name": "google-maps",
-  "service": "google-maps",
+  "name": "my-tool",
   "type": "skill",
-  "description": "Google Maps via goplaces CLI",
-  "secrets": [{ "name": "api-key", "envVar": "GOOGLE_MAPS_API_KEY" }],
-  "variables": [{ "name": "profile", "description": "gog profile name" }],
+  "description": "My CLI tool integration",
+  "secrets": [{ "name": "api-key", "envVar": "MY_TOOL_API_KEY" }],
+  "variables": [{ "name": "workspace", "description": "Workspace name" }],
   "cli": {
-    "command": "goplaces",
-    "source": "https://github.com/steipete/goplaces",
-    "install": "brew install steipete/tap/goplaces"
+    "command": "my-tool",
+    "source": "https://github.com/example/my-tool",
+    "install": "brew install example/tap/my-tool"
   }
 }
 \`\`\`
@@ -173,13 +173,13 @@ Running setup again with a different \`--account\` is additive:
 
 - **MCP**: Creates a separate server entry named \`<recipe>-<account>\`. The first entry is renamed too.
 - **Skill context.md**: Regenerated with per-account sections for all configured accounts.
-- **Skill .env**: Single account uses clean names (\`GOOGLE_MAPS_API_KEY\`). Multiple accounts suffix all (\`GOOGLE_MAPS_API_KEY_PERSONAL\`, \`GOOGLE_MAPS_API_KEY_ACME\`).
+- **Skill .env**: Single account uses clean names (\`MY_API_KEY\`). Multiple accounts suffix all (\`MY_API_KEY_PERSONAL\`, \`MY_API_KEY_ACME\`).
 
 Setup state is tracked in \`.claude/plugga.json\` per project.
 
 ## Important Notes for Claude
 
-- Services are shared namespaces. Multiple recipes can reference the same service (e.g., a \`linear\` MCP recipe and a \`linear-cli\` skill recipe both use secrets from the \`linear\` service).
+- Services are shared namespaces. Multiple recipes can reference the same service (e.g., an MCP recipe and a skill recipe for the same tool can share credentials by using the same \`service\` value).
 - When the user asks to set up a new integration, check if a recipe already exists with \`plugga recipes list\`. If not, help them create one.
 - Always ask the user which account to use if they have multiple accounts for a service and no default is set.
 - When creating recipes, ask the user what type of integration they want (MCP or skill) and what secrets/variables the service requires. The \`--service\` flag defaults to the recipe name, so omit it unless the service name differs from the recipe name (e.g., when two recipes share one service).
