@@ -6,6 +6,7 @@ import {
   handleAccountsRename,
   handleAccountsSetDefault,
   handleAccountsShow,
+  handleAccountsUnsetDefault,
 } from '~/commands/accounts';
 import { handleInit } from '~/commands/init';
 import { handleInstallSkill } from '~/commands/install-skill';
@@ -201,6 +202,11 @@ accountsCmd
   .action((service: string, account: string) =>
     handleAccountsSetDefault({ service, account })
   );
+
+accountsCmd
+  .command('unset-default <service>')
+  .description('Remove the default account for a service')
+  .action((service: string) => handleAccountsUnsetDefault(service));
 
 accountsCmd
   .command('rename')

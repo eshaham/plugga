@@ -43,6 +43,12 @@ async function setDefaultAccount(
   await saveAccountsConfig(config);
 }
 
+async function unsetDefaultAccount(service: string): Promise<void> {
+  const config = await loadAccountsConfig();
+  delete config.defaults[service];
+  await saveAccountsConfig(config);
+}
+
 async function resolveAccount(
   service: string,
   explicitAccount: string | undefined
@@ -67,5 +73,6 @@ export {
   resolveAccount,
   saveAccountsConfig,
   setDefaultAccount,
+  unsetDefaultAccount,
 };
 export type { AccountsConfig };
