@@ -74,9 +74,12 @@ plugga variables get \
 ```bash
 plugga accounts show <service>                  # Show default account
 plugga accounts set-default <service> <account> # Set default account
+plugga accounts unset-default <service>         # Remove default account
 plugga accounts rename \
   --service <s> --old-name <o> --new-name <n>   # Rename an account
 ```
+
+`set-default` and `unset-default` automatically rename MCP server entries across all registered projects.
 
 ### Setup
 
@@ -102,9 +105,15 @@ Sets up a recipe in the current project:
 4. Write secrets as environment variables to `.claude/settings.local.json` `env` field (automatically available in shell)
 5. Warn if `settings.local.json` is not in `.gitignore`
 
+**MCP server naming**: The entry name depends on whether the account is the service default:
+
+- Default account → `<recipe>` (e.g., `linear`)
+- Non-default account → `<recipe>-<account>` (e.g., `linear-acme`)
+- No default set → always `<recipe>-<account>`
+
 **Multi-account setup**: Running setup again with a different `--account` adds to existing configuration:
 
-- MCP: creates a separate server entry named `<recipe>-<account>` (renames the first entry too)
+- MCP: creates a separate server entry using the naming rules above
 - Skill context.md: regenerated listing all configured accounts with per-account sections
 - Skill env vars: single account uses clean names (`MY_API_KEY`), multi-account suffixes all (`MY_API_KEY_PERSONAL`, `MY_API_KEY_ACME`)
 
