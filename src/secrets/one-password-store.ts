@@ -2,7 +2,7 @@ import { getTag, resolveProfile } from '~/config/profiles';
 import { exec } from '~/exec/runner';
 import { logError, logInfo } from '~/logging/logger';
 
-import type { SecretReference, SecretsStore } from './types';
+import type { AccountReference, SecretReference, SecretsStore } from './types';
 
 function itemTitle(ref: SecretReference): string {
   return `${ref.service}/${ref.account}`;
@@ -171,8 +171,41 @@ function createOnePasswordStore(): SecretsStore {
       const { vault, account } = await opArgs(ref.account);
       const result = await exec('op', [
         'item',
-        'delete',
+        'edit',
         itemTitle(ref),
+        '--vault',
+        vault,
+        '--account',
+        account,
+        '--delete-field',
+        ref.key,
+      ]);
+
+      if (result.exitCode !== 0) {
+        await logError('secrets.delete', new Error(result.stderr), {
+          service: ref.service,
+          account: ref.account,
+          key: ref.key,
+        });
+        throw new Error(
+          `Failed to delete secret "${ref.key}" for ${ref.service}/${ref.account}`
+        );
+      }
+
+      await logInfo('secrets.delete', {
+        service: ref.service,
+        account: ref.account,
+        key: ref.key,
+      });
+    },
+
+    async deleteAccount(ref: AccountReference): Promise<void> {
+      const { vault, account } = await opArgs(ref.account);
+      const title = `${ref.service}/${ref.account}`;
+      const result = await exec('op', [
+        'item',
+        'delete',
+        title,
         '--vault',
         vault,
         '--account',
@@ -180,7 +213,7 @@ function createOnePasswordStore(): SecretsStore {
       ]);
 
       if (result.exitCode !== 0) {
-        await logError('secrets.delete', new Error(result.stderr), {
+        await logError('secrets.delete-account', new Error(result.stderr), {
           service: ref.service,
           account: ref.account,
         });
@@ -189,7 +222,7 @@ function createOnePasswordStore(): SecretsStore {
         );
       }
 
-      await logInfo('secrets.delete', {
+      await logInfo('secrets.delete-account', {
         service: ref.service,
         account: ref.account,
       });

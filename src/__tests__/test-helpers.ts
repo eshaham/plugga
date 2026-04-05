@@ -2,7 +2,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { SecretReference, SecretsStore } from '~/secrets/types';
+import type {
+  AccountReference,
+  SecretReference,
+  SecretsStore,
+} from '~/secrets/types';
 
 function makeKey(ref: SecretReference): string {
   return `${ref.service}/${ref.account}/${ref.key}`;
@@ -29,6 +33,14 @@ function createMockStore(initial?: Record<string, string>): SecretsStore {
     },
     delete(ref: SecretReference): Promise<void> {
       data.delete(makeKey(ref));
+      return Promise.resolve();
+    },
+    deleteAccount(ref: AccountReference): Promise<void> {
+      for (const key of data.keys()) {
+        if (key.startsWith(`${ref.service}/${ref.account}/`)) {
+          data.delete(key);
+        }
+      }
       return Promise.resolve();
     },
   };

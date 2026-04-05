@@ -17,6 +17,12 @@ interface SecretsGetInput {
 interface SecretsDeleteInput {
   service: string;
   account: string;
+  name: string;
+}
+
+interface SecretsDeleteAccountInput {
+  service: string;
+  account: string;
 }
 
 async function handleSecretsSet(
@@ -95,23 +101,62 @@ async function handleSecretsDelete(
     await store.delete({
       service: input.service,
       account: input.account,
-      key: '',
+      key: input.name,
     });
-    console.log(`Deleted all secrets for ${input.service}/${input.account}`);
+    console.log(
+      `Deleted "${input.name}" for ${input.service}/${input.account}`
+    );
     await logInfo('secrets.delete', {
       service: input.service,
       account: input.account,
+      name: input.name,
     });
   } catch (error) {
     await logError('secrets.delete', error, {
       service: input.service,
       account: input.account,
+      name: input.name,
     });
     console.error(
-      `Failed to delete secrets: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to delete secret: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
 
-export { handleSecretsDelete, handleSecretsGet, handleSecretsSet };
-export type { SecretsDeleteInput, SecretsGetInput, SecretsSetInput };
+async function handleSecretsDeleteAccount(
+  input: SecretsDeleteAccountInput,
+  store: SecretsStore
+): Promise<void> {
+  try {
+    await store.deleteAccount({
+      service: input.service,
+      account: input.account,
+    });
+    console.log(`Deleted all secrets for ${input.service}/${input.account}`);
+    await logInfo('secrets.delete-account', {
+      service: input.service,
+      account: input.account,
+    });
+  } catch (error) {
+    await logError('secrets.delete-account', error, {
+      service: input.service,
+      account: input.account,
+    });
+    console.error(
+      `Failed to delete account secrets: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+export {
+  handleSecretsDelete,
+  handleSecretsDeleteAccount,
+  handleSecretsGet,
+  handleSecretsSet,
+};
+export type {
+  SecretsDeleteAccountInput,
+  SecretsDeleteInput,
+  SecretsGetInput,
+  SecretsSetInput,
+};

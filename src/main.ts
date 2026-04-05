@@ -17,6 +17,7 @@ import {
 } from '~/commands/recipes';
 import {
   handleSecretsDelete,
+  handleSecretsDeleteAccount,
   handleSecretsGet,
   handleSecretsSet,
 } from '~/commands/secrets';
@@ -107,11 +108,30 @@ secrets
 
 secrets
   .command('delete')
-  .description('Delete all secrets for a service and account')
+  .description('Delete a specific secret field for a service and account')
+  .requiredOption('--service <service>', 'Service name')
+  .requiredOption('--account <account>', 'Account name')
+  .requiredOption('--name <name>', 'Secret name to delete')
+  .action((opts) =>
+    handleSecretsDelete(
+      {
+        service: opts.service as string,
+        account: opts.account as string,
+        name: opts.name as string,
+      },
+      store
+    )
+  );
+
+secrets
+  .command('delete-account')
+  .description(
+    'Delete ALL secrets for a service and account (removes the entire 1Password item)'
+  )
   .requiredOption('--service <service>', 'Service name')
   .requiredOption('--account <account>', 'Account name')
   .action((opts) =>
-    handleSecretsDelete(
+    handleSecretsDeleteAccount(
       {
         service: opts.service as string,
         account: opts.account as string,

@@ -47,7 +47,11 @@ plugga recipes show <name>
 ```bash
 plugga secrets set --service <s> --account <a> --name <n> --value <v>
 plugga secrets get --service <s> [--account <a>] [--name <n>]
+plugga secrets delete --service <s> --account <a> --name <n>
+plugga secrets delete-account --service <s> --account <a>
 ```
+
+`secrets delete` removes one specific secret field. `secrets delete-account` removes the entire 1Password item (all secrets for that service/account).
 
 Secrets are stored in 1Password as concealed fields within items named `<service>/<account>`.
 
