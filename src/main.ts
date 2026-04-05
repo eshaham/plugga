@@ -15,7 +15,11 @@ import {
   handleRecipesList,
   handleRecipesShow,
 } from '~/commands/recipes';
-import { handleSecretsGet, handleSecretsSet } from '~/commands/secrets';
+import {
+  handleSecretsDelete,
+  handleSecretsGet,
+  handleSecretsSet,
+} from '~/commands/secrets';
 import { handleSetup } from '~/commands/setup';
 import { handleVariablesGet, handleVariablesSet } from '~/commands/variables';
 import { createOnePasswordStore } from '~/secrets/one-password-store';
@@ -96,6 +100,23 @@ secrets
         service: opts.service as string,
         account: opts.account as string | undefined,
         name: opts.name as string | undefined,
+      },
+      store
+    )
+  );
+
+secrets
+  .command('delete')
+  .description('Delete a secret for a service and account')
+  .requiredOption('--service <service>', 'Service name')
+  .requiredOption('--account <account>', 'Account name')
+  .requiredOption('--name <name>', 'Secret name')
+  .action((opts) =>
+    handleSecretsDelete(
+      {
+        service: opts.service as string,
+        account: opts.account as string,
+        name: opts.name as string,
       },
       store
     )

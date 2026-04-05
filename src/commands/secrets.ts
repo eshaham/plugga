@@ -14,6 +14,12 @@ interface SecretsGetInput {
   name?: string;
 }
 
+interface SecretsDeleteInput {
+  service: string;
+  account: string;
+  name: string;
+}
+
 async function handleSecretsSet(
   input: SecretsSetInput,
   store: SecretsStore
@@ -82,5 +88,35 @@ async function handleSecretsGet(
   }
 }
 
-export { handleSecretsGet, handleSecretsSet };
-export type { SecretsGetInput, SecretsSetInput };
+async function handleSecretsDelete(
+  input: SecretsDeleteInput,
+  store: SecretsStore
+): Promise<void> {
+  try {
+    await store.delete({
+      service: input.service,
+      account: input.account,
+      key: input.name,
+    });
+    console.log(
+      `Deleted "${input.name}" for ${input.service}/${input.account}`
+    );
+    await logInfo('secrets.delete', {
+      service: input.service,
+      account: input.account,
+      name: input.name,
+    });
+  } catch (error) {
+    await logError('secrets.delete', error, {
+      service: input.service,
+      account: input.account,
+      name: input.name,
+    });
+    console.error(
+      `Failed to delete secret: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+export { handleSecretsDelete, handleSecretsGet, handleSecretsSet };
+export type { SecretsDeleteInput, SecretsGetInput, SecretsSetInput };

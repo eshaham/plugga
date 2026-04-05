@@ -171,12 +171,14 @@ function createOnePasswordStore(): SecretsStore {
       const { vault, account } = await opArgs(ref.account);
       const result = await exec('op', [
         'item',
-        'delete',
+        'edit',
         itemTitle(ref),
         '--vault',
         vault,
         '--account',
         account,
+        '--delete-field',
+        ref.key,
       ]);
 
       if (result.exitCode !== 0) {
@@ -186,7 +188,7 @@ function createOnePasswordStore(): SecretsStore {
           key: ref.key,
         });
         throw new Error(
-          `Failed to delete secret for ${ref.service}/${ref.account}`
+          `Failed to delete secret "${ref.key}" for ${ref.service}/${ref.account}`
         );
       }
 
