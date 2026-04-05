@@ -164,10 +164,12 @@ Note: `service` is only needed when it differs from the recipe name (here `my-se
 
 1. Resolves the account (explicit or default for the service).
 2. Fetches secrets from 1Password.
-3. Writes a server entry to `.claude/settings.local.json`.
+3. Writes a server entry to `~/.claude.json` under `projects["<projectDir>"].mcpServers`.
    - stdio: `{ command, args, env }` with secrets as env vars.
    - sse: `{ url, headers }` with secrets in headers.
    - http: `{ type: "http", url, headers }` with secrets + static headers merged.
+
+**Prerequisite:** Claude Code must have been opened in the project directory at least once before running MCP setup (so the project entry exists in `~/.claude.json`).
 
 ### Skill Setup
 

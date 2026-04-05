@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
 import { resolveAccount } from '~/config/accounts';
@@ -61,6 +62,27 @@ function suffixEnvVar(envVar: string, account: string): string {
   return `${envVar}_${account.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
 }
 
+async function readClaudeJson(): Promise<Record<string, unknown>> {
+  const claudeJsonPath = resolve(homedir(), '.claude.json');
+  try {
+    const content = await readFile(claudeJsonPath, 'utf-8');
+    return JSON.parse(content) as Record<string, unknown>;
+  } catch {
+    throw new Error(
+      '~/.claude.json not found. Open Claude Code at least once to initialize it.'
+    );
+  }
+}
+
+async function writeClaudeJson(data: Record<string, unknown>): Promise<void> {
+  const claudeJsonPath = resolve(homedir(), '.claude.json');
+  await writeFile(
+    claudeJsonPath,
+    JSON.stringify(data, null, 2) + '\n',
+    'utf-8'
+  );
+}
+
 async function setupMcp(
   recipe: McpRecipe,
   secrets: Record<string, string>,
@@ -68,9 +90,19 @@ async function setupMcp(
   existingAccounts: string[],
   projectDir: string
 ): Promise<void> {
-  const settingsPath = resolve(projectDir, '.claude', 'settings.local.json');
-  const settings = await readJsonFile(settingsPath);
-  const mcpServers = (settings['mcpServers'] as Record<string, unknown>) ?? {};
+  const claudeJson = await readClaudeJson();
+  const projects = (claudeJson['projects'] as Record<string, unknown>) ?? {};
+  const projectEntry =
+    (projects[projectDir] as Record<string, unknown>) ?? null;
+
+  if (!projectEntry) {
+    throw new Error(
+      `Project "${projectDir}" not found in ~/.claude.json. Open Claude Code in this directory first.`
+    );
+  }
+
+  const mcpServers =
+    (projectEntry['mcpServers'] as Record<string, unknown>) ?? {};
 
   const isMultiAccount = existingAccounts.length > 0;
   const { mcp } = recipe;
@@ -138,19 +170,12 @@ async function setupMcp(
     };
   }
 
-  settings['mcpServers'] = mcpServers;
+  projectEntry['mcpServers'] = mcpServers;
+  projects[projectDir] = projectEntry;
+  claudeJson['projects'] = projects;
+  await writeClaudeJson(claudeJson);
 
-  const claudeDir = resolve(projectDir, '.claude');
-  await mkdir(claudeDir, { recursive: true });
-  await writeFile(
-    settingsPath,
-    JSON.stringify(settings, null, 2) + '\n',
-    'utf-8'
-  );
-
-  console.log(
-    `Configured MCP server "${serverName}" in .claude/settings.local.json`
-  );
+  console.log(`Configured MCP server "${serverName}" in ~/.claude.json`);
 }
 
 async function setupSkill(
@@ -352,7 +377,9 @@ async function handleSetup(
     const updatedState = addRecipeAccount(state, input.recipe, account);
     await saveProjectState(input.projectDir, updatedState);
 
-    await checkGitignore(input.projectDir);
+    if (recipe.type === 'skill') {
+      await checkGitignore(input.projectDir);
+    }
 
     console.log(`Setup complete for ${input.recipe}/${account}`);
     await logInfo('setup', {

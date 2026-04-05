@@ -86,11 +86,13 @@ plugga setup <recipe> [--account <a>] [--project-dir <d>]
 
 Sets up a recipe in the current project:
 
-**MCP recipes** provision a server entry into `.claude/settings.local.json`:
+**MCP recipes** provision a server entry into `~/.claude.json` under `projects["<projectDir>"].mcpServers` (local scope — private to you, not in source control):
 
 - `stdio` transport maps secrets to environment variables
 - `sse` transport injects secrets into request headers
 - `http` transport merges static headers with secret-based headers
+
+**Prerequisite:** Claude Code must have been opened in the project directory at least once before running MCP setup.
 
 **Skill recipes**:
 
@@ -211,9 +213,12 @@ Skill recipes can include a `SKILL.md` file alongside `recipe.json` with markdow
 When `plugga setup` runs, it produces files in your project:
 
 ```
+~/.claude.json
+  projects["<projectDir>"].mcpServers   # MCP server entries (for MCP recipes)
+
 <project>/
   .claude/
-    settings.local.json   # MCP server entries + env vars for secrets
+    settings.local.json   # env vars for skill recipe secrets
     plugga.json           # Tracks which accounts are set up per recipe
     skills/
       <recipe>/

@@ -6,7 +6,7 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import type { McpRecipe, SkillRecipe } from '~/recipes/types';
@@ -42,6 +42,7 @@ const mockGetVariablesForAccount =
   jest.fn<
     (service: string, account: string) => Promise<Record<string, string>>
   >();
+const mockHomedir = jest.fn<() => string>();
 
 jest.unstable_mockModule('~/config/accounts', () => ({
   resolveAccount: mockResolveAccount,
@@ -65,12 +66,20 @@ jest.unstable_mockModule('~/config/variables', () => ({
   getVariablesForAccount: mockGetVariablesForAccount,
 }));
 
+jest.unstable_mockModule('node:os', () => ({
+  homedir: mockHomedir,
+}));
+
 const { handleSetup } = await import('~/commands/setup');
 
 let tempDir: string;
+let homeDir: string;
 
 beforeEach(async () => {
   tempDir = await createTempDir();
+  homeDir = resolve(tempDir, 'home');
+  await mkdir(homeDir, { recursive: true });
+  mockHomedir.mockReturnValue(homeDir);
   mockGetVariablesForAccount.mockResolvedValue({});
   mockLogInfo.mockResolvedValue(undefined);
   mockLogError.mockResolvedValue(undefined);
@@ -79,6 +88,22 @@ beforeEach(async () => {
 afterEach(async () => {
   await cleanupTempDir(tempDir);
 });
+
+async function initClaudeJson(projectDir: string): Promise<void> {
+  const claudeJsonPath = resolve(homeDir, '.claude.json');
+  const claudeJson = { projects: { [projectDir]: { mcpServers: {} } } };
+  await writeFile(claudeJsonPath, JSON.stringify(claudeJson, null, 2), 'utf-8');
+}
+
+async function readClaudeJsonMcpServers(
+  projectDir: string
+): Promise<Record<string, unknown>> {
+  const content = await readFile(resolve(homeDir, '.claude.json'), 'utf-8');
+  const data = JSON.parse(content) as {
+    projects: Record<string, { mcpServers: Record<string, unknown> }>;
+  };
+  return data.projects[projectDir]?.mcpServers ?? {};
+}
 
 function makeStdioRecipe(overrides?: Partial<McpRecipe>): McpRecipe {
   return {
@@ -153,7 +178,28 @@ async function readProjectState(): Promise<Record<string, unknown>> {
 
 describe('handleSetup', () => {
   describe('MCP stdio setup', () => {
-    it('should write correct settings.local.json', async () => {
+    it('should write correct entry to ~/.claude.json', async () => {
+      const recipe = makeStdioRecipe();
+      const store = createMockStore({
+        'github/myaccount/api-key': 'secret123',
+      });
+
+      mockResolveAccount.mockResolvedValue('myaccount');
+      mockLoadRecipe.mockResolvedValue(recipe);
+      await initClaudeJson(tempDir);
+
+      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+
+      const mcpServers = await readClaudeJsonMcpServers(tempDir);
+      expect(mcpServers['test-mcp']).toEqual({
+        command: 'npx',
+        args: ['@test/server'],
+        env: { GITHUB_TOKEN: 'secret123' },
+      });
+    });
+
+    it('should fail if ~/.claude.json does not exist', async () => {
+      const consoleSpy = jest.spyOn(console, 'error');
       const recipe = makeStdioRecipe();
       const store = createMockStore({
         'github/myaccount/api-key': 'secret123',
@@ -164,13 +210,31 @@ describe('handleSetup', () => {
 
       await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
 
-      const settings = await readSettings();
-      const mcpServers = settings['mcpServers'] as Record<string, unknown>;
-      expect(mcpServers['test-mcp']).toEqual({
-        command: 'npx',
-        args: ['@test/server'],
-        env: { GITHUB_TOKEN: 'secret123' },
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('~/.claude.json not found')
+      );
+    });
+
+    it('should fail if project not in ~/.claude.json', async () => {
+      const consoleSpy = jest.spyOn(console, 'error');
+      const recipe = makeStdioRecipe();
+      const store = createMockStore({
+        'github/myaccount/api-key': 'secret123',
       });
+
+      mockResolveAccount.mockResolvedValue('myaccount');
+      mockLoadRecipe.mockResolvedValue(recipe);
+      await writeFile(
+        resolve(homeDir, '.claude.json'),
+        JSON.stringify({ projects: {} }),
+        'utf-8'
+      );
+
+      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('not found in ~/.claude.json')
+      );
     });
   });
 
@@ -181,11 +245,11 @@ describe('handleSetup', () => {
 
       mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
+      await initClaudeJson(tempDir);
 
       await handleSetup({ recipe: 'test-sse', projectDir: tempDir }, store);
 
-      const settings = await readSettings();
-      const mcpServers = settings['mcpServers'] as Record<string, unknown>;
+      const mcpServers = await readClaudeJsonMcpServers(tempDir);
       expect(mcpServers['test-sse']).toEqual({
         url: 'https://example.com/sse',
         headers: { Authorization: 'Bearer mytoken' },
@@ -200,11 +264,11 @@ describe('handleSetup', () => {
 
       mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
+      await initClaudeJson(tempDir);
 
       await handleSetup({ recipe: 'test-http', projectDir: tempDir }, store);
 
-      const settings = await readSettings();
-      const mcpServers = settings['mcpServers'] as Record<string, unknown>;
+      const mcpServers = await readClaudeJsonMcpServers(tempDir);
       expect(mcpServers['test-http']).toEqual({
         type: 'http',
         url: 'https://example.com/mcp',
@@ -288,13 +352,13 @@ describe('handleSetup', () => {
 
       mockResolveAccount.mockResolvedValue('acct1');
       mockLoadRecipe.mockResolvedValue(recipe);
+      await initClaudeJson(tempDir);
       await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
 
       mockResolveAccount.mockResolvedValue('acct2');
       await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
 
-      const settings = await readSettings();
-      const mcpServers = settings['mcpServers'] as Record<string, unknown>;
+      const mcpServers = await readClaudeJsonMcpServers(tempDir);
       expect(mcpServers['test-mcp']).toBeUndefined();
       expect(mcpServers['test-mcp-acct1']).toBeDefined();
       expect(mcpServers['test-mcp-acct2']).toBeDefined();
@@ -334,6 +398,7 @@ describe('handleSetup', () => {
 
       mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
+      await initClaudeJson(tempDir);
 
       await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
 
