@@ -107,16 +107,14 @@ secrets
 
 secrets
   .command('delete')
-  .description('Delete a secret for a service and account')
+  .description('Delete all secrets for a service and account')
   .requiredOption('--service <service>', 'Service name')
   .requiredOption('--account <account>', 'Account name')
-  .requiredOption('--name <name>', 'Secret name')
   .action((opts) =>
     handleSecretsDelete(
       {
         service: opts.service as string,
         account: opts.account as string,
-        name: opts.name as string,
       },
       store
     )

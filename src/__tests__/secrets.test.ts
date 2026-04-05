@@ -119,28 +119,21 @@ describe('secrets get', () => {
 });
 
 describe('secrets delete', () => {
-  it('should delete a secret and log success', async () => {
+  it('should delete all secrets for a service/account and log success', async () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const store = createMockStore({ 'github/personal/api-key': 'abc123' });
 
     await handleSecretsDelete(
-      { service: 'github', account: 'personal', name: 'api-key' },
+      { service: 'github', account: 'personal' },
       store
     );
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      'Deleted "api-key" for github/personal'
+      'Deleted all secrets for github/personal'
     );
-    expect(
-      await store.has({
-        service: 'github',
-        account: 'personal',
-        key: 'api-key',
-      })
-    ).toBe(false);
     expect(mockLogInfo).toHaveBeenCalledWith(
       'secrets.delete',
-      expect.objectContaining({ name: 'api-key' })
+      expect.objectContaining({ service: 'github', account: 'personal' })
     );
   });
 
@@ -152,12 +145,12 @@ describe('secrets delete', () => {
     jest.spyOn(store, 'delete').mockRejectedValue(new Error('op failed'));
 
     await handleSecretsDelete(
-      { service: 'github', account: 'personal', name: 'api-key' },
+      { service: 'github', account: 'personal' },
       store
     );
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to delete secret')
+      expect.stringContaining('Failed to delete secrets')
     );
     expect(mockLogError).toHaveBeenCalled();
   });
