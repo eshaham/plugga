@@ -1,8 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { resolveAccount } from '~/config/accounts';
+import { getDefaultAccount, resolveAccount } from '~/config/accounts';
+import { readClaudeJson, writeClaudeJson } from '~/config/claude-json';
+import { registerProject } from '~/config/projects-registry';
 import { getVariablesForAccount } from '~/config/variables';
 import { exec } from '~/exec/runner';
 import { logError, logInfo } from '~/logging/logger';
@@ -58,36 +59,14 @@ async function readJsonFile(path: string): Promise<Record<string, unknown>> {
   }
 }
 
-function suffixEnvVar(envVar: string, account: string): string {
+export function suffixEnvVar(envVar: string, account: string): string {
   return `${envVar}_${account.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
-}
-
-async function readClaudeJson(): Promise<Record<string, unknown>> {
-  const claudeJsonPath = resolve(homedir(), '.claude.json');
-  try {
-    const content = await readFile(claudeJsonPath, 'utf-8');
-    return JSON.parse(content) as Record<string, unknown>;
-  } catch {
-    throw new Error(
-      '~/.claude.json not found. Open Claude Code at least once to initialize it.'
-    );
-  }
-}
-
-async function writeClaudeJson(data: Record<string, unknown>): Promise<void> {
-  const claudeJsonPath = resolve(homedir(), '.claude.json');
-  await writeFile(
-    claudeJsonPath,
-    JSON.stringify(data, null, 2) + '\n',
-    'utf-8'
-  );
 }
 
 async function setupMcp(
   recipe: McpRecipe,
   secrets: Record<string, string>,
   account: string,
-  existingAccounts: string[],
   projectDir: string
 ): Promise<void> {
   const claudeJson = await readClaudeJson();
@@ -104,22 +83,10 @@ async function setupMcp(
   const mcpServers =
     (projectEntry['mcpServers'] as Record<string, unknown>) ?? {};
 
-  const isMultiAccount = existingAccounts.length > 0;
+  const defaultAccount = await getDefaultAccount(recipe.service);
+  const serverName =
+    account === defaultAccount ? recipe.name : `${recipe.name}-${account}`;
   const { mcp } = recipe;
-
-  if (isMultiAccount && existingAccounts.length === 1) {
-    const firstAccount = existingAccounts[0] ?? '';
-    const existingEntry = mcpServers[recipe.name];
-    if (existingEntry) {
-      mcpServers[`${recipe.name}-${firstAccount}`] = existingEntry;
-      delete mcpServers[recipe.name];
-      console.log(
-        `Renamed existing MCP server "${recipe.name}" to "${recipe.name}-${firstAccount}"`
-      );
-    }
-  }
-
-  const serverName = isMultiAccount ? `${recipe.name}-${account}` : recipe.name;
 
   if (mcp.transport === 'stdio') {
     const envMapping: Record<string, string> = {};
@@ -221,9 +188,6 @@ async function setupSkill(
 
   const secretsWithEnvVars = (recipe.secrets ?? []).filter((s) => s.envVar);
   if (secretsWithEnvVars.length > 0) {
-    const allAccounts = [...existingAccounts, account].filter(
-      (a, i, arr) => arr.indexOf(a) === i
-    );
     const isMultiAccount = allAccounts.length > 1;
 
     const settingsPath = resolve(projectDir, '.claude', 'settings.local.json');
@@ -357,13 +321,7 @@ async function handleSetup(
     }
 
     if (recipe.type === 'mcp') {
-      await setupMcp(
-        recipe,
-        secrets,
-        account,
-        existingAccounts,
-        input.projectDir
-      );
+      await setupMcp(recipe, secrets, account, input.projectDir);
     } else if (recipe.type === 'skill') {
       await setupSkill(
         recipe,
@@ -376,6 +334,7 @@ async function handleSetup(
 
     const updatedState = addRecipeAccount(state, input.recipe, account);
     await saveProjectState(input.projectDir, updatedState);
+    await registerProject(input.projectDir, input.recipe);
 
     if (recipe.type === 'skill') {
       await checkGitignore(input.projectDir);

@@ -15,6 +15,8 @@ import { cleanupTempDir, createMockStore, createTempDir } from './test-helpers';
 
 const mockResolveAccount =
   jest.fn<(service: string, account: string | undefined) => Promise<string>>();
+const mockGetDefaultAccount =
+  jest.fn<(service: string) => Promise<string | undefined>>();
 const mockLoadRecipe =
   jest.fn<(name: string) => Promise<McpRecipe | SkillRecipe>>();
 const mockLoadSkillContent =
@@ -46,6 +48,7 @@ const mockHomedir = jest.fn<() => string>();
 
 jest.unstable_mockModule('~/config/accounts', () => ({
   resolveAccount: mockResolveAccount,
+  getDefaultAccount: mockGetDefaultAccount,
 }));
 
 jest.unstable_mockModule('~/recipes/recipe-loader', () => ({
@@ -81,6 +84,7 @@ beforeEach(async () => {
   await mkdir(homeDir, { recursive: true });
   mockHomedir.mockReturnValue(homeDir);
   mockGetVariablesForAccount.mockResolvedValue({});
+  mockGetDefaultAccount.mockResolvedValue('myaccount');
   mockLogInfo.mockResolvedValue(undefined);
   mockLogError.mockResolvedValue(undefined);
 });
@@ -343,13 +347,14 @@ describe('handleSetup', () => {
   });
 
   describe('multi-account MCP setup', () => {
-    it('should rename first server entry when adding second account', async () => {
+    it('should use suffixed names when no default account is set', async () => {
       const recipe = makeStdioRecipe();
       const store = createMockStore({
         'github/acct1/api-key': 'secret1',
         'github/acct2/api-key': 'secret2',
       });
 
+      mockGetDefaultAccount.mockResolvedValue(undefined);
       mockResolveAccount.mockResolvedValue('acct1');
       mockLoadRecipe.mockResolvedValue(recipe);
       await initClaudeJson(tempDir);
@@ -361,6 +366,28 @@ describe('handleSetup', () => {
       const mcpServers = await readClaudeJsonMcpServers(tempDir);
       expect(mcpServers['test-mcp']).toBeUndefined();
       expect(mcpServers['test-mcp-acct1']).toBeDefined();
+      expect(mcpServers['test-mcp-acct2']).toBeDefined();
+    });
+
+    it('should use plain name for default account and suffixed for others', async () => {
+      const recipe = makeStdioRecipe();
+      const store = createMockStore({
+        'github/acct1/api-key': 'secret1',
+        'github/acct2/api-key': 'secret2',
+      });
+
+      mockGetDefaultAccount.mockResolvedValue('acct1');
+      mockResolveAccount.mockResolvedValue('acct1');
+      mockLoadRecipe.mockResolvedValue(recipe);
+      await initClaudeJson(tempDir);
+      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+
+      mockResolveAccount.mockResolvedValue('acct2');
+      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+
+      const mcpServers = await readClaudeJsonMcpServers(tempDir);
+      expect(mcpServers['test-mcp']).toBeDefined();
+      expect(mcpServers['test-mcp-acct1']).toBeUndefined();
       expect(mcpServers['test-mcp-acct2']).toBeDefined();
     });
   });
