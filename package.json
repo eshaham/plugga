@@ -1,6 +1,6 @@
 {
   "name": "plugga",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Centralized CLI for managing service integrations and secrets across projects",
   "repository": {
     "type": "git",
