@@ -1,7 +1,11 @@
 {
   "name": "plugga",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "description": "Centralized CLI for managing service integrations and secrets across projects",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eshaham/plugga"
+  },
   "main": "dist/main.js",
   "type": "module",
   "bin": {
