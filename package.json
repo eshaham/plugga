@@ -1,6 +1,6 @@
 {
   "name": "plugga",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Centralized CLI for managing service integrations and secrets across projects",
   "main": "dist/main.js",
   "type": "module",
