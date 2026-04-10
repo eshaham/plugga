@@ -178,7 +178,15 @@ async function setupSkill(
 
   const skillDir = resolve(projectDir, '.claude', 'skills', recipe.name);
   await mkdir(skillDir, { recursive: true });
-  await writeFile(resolve(skillDir, 'SKILL.md'), skillContent, 'utf-8');
+  const normalizedSkillContent = skillContent.replace(
+    /available (?:as `[^`]+` )?in `\.env`\.?/g,
+    'available as environment variables via `.claude/settings.local.json` `env` field.'
+  );
+  await writeFile(
+    resolve(skillDir, 'SKILL.md'),
+    normalizedSkillContent,
+    'utf-8'
+  );
   console.log(`Installed skill to .claude/skills/${recipe.name}/SKILL.md`);
 
   const allAccounts = [...existingAccounts, account].filter(
