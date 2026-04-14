@@ -6,9 +6,17 @@ interface ExecResult {
   exitCode: number;
 }
 
-function exec(command: string, args: string[]): Promise<ExecResult> {
+interface ExecOptions {
+  cwd?: string;
+}
+
+function exec(
+  command: string,
+  args: string[],
+  options?: ExecOptions
+): Promise<ExecResult> {
   return new Promise((resolve) => {
-    execFile(command, args, (error, stdout, stderr) => {
+    execFile(command, args, { cwd: options?.cwd }, (error, stdout, stderr) => {
       const exitCode =
         error && 'code' in error && typeof error.code === 'number'
           ? error.code
@@ -26,4 +34,4 @@ function exec(command: string, args: string[]): Promise<ExecResult> {
 }
 
 export { exec };
-export type { ExecResult };
+export type { ExecOptions, ExecResult };

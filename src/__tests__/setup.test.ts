@@ -25,7 +25,8 @@ const mockExec =
   jest.fn<
     (
       cmd: string,
-      args: string[]
+      args: string[],
+      options?: { cwd?: string }
     ) => Promise<{ stdout: string; stderr: string; exitCode: number }>
   >();
 const mockLogInfo =
@@ -87,6 +88,7 @@ beforeEach(async () => {
   mockGetDefaultAccount.mockResolvedValue('myaccount');
   mockLogInfo.mockResolvedValue(undefined);
   mockLogError.mockResolvedValue(undefined);
+  mockExec.mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 });
 });
 
 afterEach(async () => {
@@ -439,7 +441,7 @@ describe('handleSetup', () => {
   });
 
   describe('.gitignore warning', () => {
-    it('should warn when settings.local.json not in .gitignore', async () => {
+    it('should warn when settings.local.json is not gitignored', async () => {
       const consoleSpy = jest.spyOn(console, 'warn');
       const recipe = makeSkillRecipe();
       const store = createMockStore({
@@ -449,12 +451,8 @@ describe('handleSetup', () => {
       mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# Skill');
+      mockExec.mockResolvedValue({ stdout: '', stderr: '', exitCode: 1 });
 
-      await writeFile(
-        resolve(tempDir, '.gitignore'),
-        'node_modules\n',
-        'utf-8'
-      );
       await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -462,7 +460,7 @@ describe('handleSetup', () => {
       );
     });
 
-    it('should warn when no .gitignore exists', async () => {
+    it('should not warn when settings.local.json is gitignored', async () => {
       const consoleSpy = jest.spyOn(console, 'warn');
       const recipe = makeSkillRecipe();
       const store = createMockStore({
@@ -472,37 +470,14 @@ describe('handleSetup', () => {
       mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# Skill');
+      mockExec.mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 });
 
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No .gitignore found')
-      );
-    });
-
-    it('should not warn when settings.local.json is in .gitignore', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn');
-      const recipe = makeSkillRecipe();
-      const store = createMockStore({
-        'github/myaccount/api-key': 'secret123',
-      });
-
-      mockResolveAccount.mockResolvedValue('myaccount');
-      mockLoadRecipe.mockResolvedValue(recipe);
-      mockLoadSkillContent.mockResolvedValue('# Skill');
-
-      await writeFile(
-        resolve(tempDir, '.gitignore'),
-        '.claude/settings.local.json\nnode_modules\n',
-        'utf-8'
-      );
       await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
 
       const envWarnings = consoleSpy.mock.calls.filter(
         (call) =>
           typeof call[0] === 'string' &&
-          (call[0].includes('settings.local.json is not in .gitignore') ||
-            call[0].includes('No .gitignore found'))
+          call[0].includes('settings.local.json is not in .gitignore')
       );
       expect(envWarnings).toHaveLength(0);
     });

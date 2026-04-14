@@ -295,17 +295,14 @@ async function generateContextFile(
 }
 
 async function checkGitignore(projectDir: string): Promise<void> {
-  const gitignorePath = resolve(projectDir, '.gitignore');
-  try {
-    const content = await readFile(gitignorePath, 'utf-8');
-    if (!content.includes('settings.local.json')) {
-      console.warn(
-        'Warning: settings.local.json is not in .gitignore. Consider adding .claude/settings.local.json to avoid committing secrets.'
-      );
-    }
-  } catch {
+  const result = await exec(
+    'git',
+    ['check-ignore', '-q', '.claude/settings.local.json'],
+    { cwd: projectDir }
+  );
+  if (result.exitCode !== 0) {
     console.warn(
-      'Warning: No .gitignore found. Consider adding .claude/settings.local.json to avoid committing secrets.'
+      'Warning: settings.local.json is not in .gitignore. Consider adding .claude/settings.local.json to avoid committing secrets.'
     );
   }
 }
