@@ -67,6 +67,7 @@ Variables are non-sensitive configuration stored locally (not in 1Password).
 ### Manage Accounts
 
 ```bash
+plugga accounts list <service>
 plugga accounts show <service>
 plugga accounts set-default <service> <account>
 plugga accounts unset-default <service>
@@ -215,13 +216,15 @@ The only files you should edit directly are:
 
 1. Run `plugga recipes list` to see if a recipe already exists.
 2. If it exists, run `plugga recipes show <name>` to see its current configuration.
-3. Run `plugga secrets get --service <s> --account <a>` to check if secrets are already stored.
-4. Only create or configure what is missing — do not recreate things that already exist.
+3. Run `plugga accounts list <service>` to see which accounts already exist for the service.
+4. If accounts exist, ask the user whether they want to use one of the existing accounts or create a new one.
+5. Run `plugga secrets get --service <s> --account <a>` to check if secrets are already stored.
+6. Only create or configure what is missing — do not recreate things that already exist.
 
 - For new recipes, create with `plugga recipes add`, then edit the generated recipe.json to add `secrets`, `variables`, and `cli` fields.
 - For skill recipes, you MUST create a `SKILL.md` file at `~/.config/plugga/recipes/<name>/SKILL.md`. This is required — `plugga setup` will fail without it.
 - Services are shared namespaces. Multiple recipes can reference the same service (e.g., an MCP recipe and a skill recipe for the same tool can share credentials by using the same `service` value).
-- Always confirm the account name with the user before running setup or storing secrets — never infer it from context (e.g., do not assume the account name from a 1Password profile name or existing defaults). Suggest a name based on available context, but let the user confirm or change it.
+- Always confirm the account name with the user before running setup or storing secrets. Run `plugga accounts list <service>` first — if accounts exist, present them and ask whether to use an existing one or create a new one. Never infer the account name from context. Suggest a name based on available context, but let the user confirm or change it.
 - After confirming the account, ask the user whether they want it set as the default for that service (`plugga accounts set-default <service> <account>`). Explain that the default affects MCP server naming: the default account gets the plain recipe name (e.g., `linear`), others get a suffix (e.g., `linear-acme`).
 - The `--service` flag defaults to the recipe name, so omit it unless the service name differs from the recipe name (e.g., when two recipes share one service).
 - Secrets are set one at a time: `plugga secrets set --service <s> --account <a> --name <n> --value <v>`.

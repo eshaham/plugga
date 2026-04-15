@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import type { McpRecipe } from '~/recipes/types';
 
-import { cleanupTempDir, createTempDir } from './test-helpers';
+import { cleanupTempDir, createMockStore, createTempDir } from './test-helpers';
 
 const mockRenameMcpEntry =
   jest.fn<
@@ -62,6 +62,7 @@ const {
   setDefaultAccount,
 } = await import('~/config/accounts');
 const {
+  handleAccountsList,
   handleAccountsSetDefault,
   handleAccountsShow,
   handleAccountsUnsetDefault,
@@ -305,5 +306,78 @@ describe('handleAccountsUnsetDefault', () => {
     await handleAccountsUnsetDefault('github');
 
     expect(mockRenameMcpEntry).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleAccountsList', () => {
+  it('should list accounts for a service', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const store = createMockStore({
+      'github/personal/api-key': 'token1',
+      'github/work/api-key': 'token2',
+    });
+
+    await handleAccountsList('github', store);
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('github'));
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('personal')
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('work'));
+  });
+
+  it('should mark the default account', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await setDefaultAccount('github', 'personal');
+    const store = createMockStore({
+      'github/personal/api-key': 'token1',
+      'github/work/api-key': 'token2',
+    });
+
+    await handleAccountsList('github', store);
+
+    const calls = consoleSpy.mock.calls.map((c) => String(c[0]));
+    const personalLine = calls.find((c) => c.includes('personal'));
+    const workLine = calls.find((c) => c.includes('work'));
+    expect(personalLine).toContain('(default)');
+    expect(workLine).not.toContain('(default)');
+  });
+
+  it('should show message when no accounts exist', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const store = createMockStore({});
+
+    await handleAccountsList('github', store);
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('No accounts found')
+    );
+  });
+
+  it('should not list accounts from other services', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const store = createMockStore({
+      'github/personal/api-key': 'token1',
+      'linear/work/api-key': 'token2',
+    });
+
+    await handleAccountsList('github', store);
+
+    const calls = consoleSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((c) => c.includes('linear'))).toBe(false);
+  });
+
+  it('should print error when store throws', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const store = createMockStore({});
+    jest.spyOn(store, 'listAccounts').mockRejectedValue(new Error('op failed'));
+
+    await handleAccountsList('github', store);
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to list accounts')
+    );
   });
 });

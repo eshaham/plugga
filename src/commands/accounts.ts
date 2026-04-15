@@ -9,6 +9,7 @@ import { renameMcpEntry } from '~/config/claude-json';
 import { loadProjectsRegistry } from '~/config/projects-registry';
 import { logInfo } from '~/logging/logger';
 import { loadRecipe } from '~/recipes/recipe-loader';
+import type { SecretsStore } from '~/secrets/types';
 
 import { getRecipeAccounts, loadProjectState } from './project-state';
 
@@ -125,7 +126,31 @@ async function handleAccountsShow(service: string): Promise<void> {
   }
 }
 
+async function handleAccountsList(
+  service: string,
+  store: SecretsStore
+): Promise<void> {
+  try {
+    const accounts = await store.listAccounts(service);
+    if (accounts.length === 0) {
+      console.log(`No accounts found for service "${service}"`);
+      return;
+    }
+    const defaultAccount = await getDefaultAccount(service);
+    console.log(`Accounts for ${service}:`);
+    for (const account of accounts) {
+      const isDefault = account === defaultAccount;
+      console.log(`  ${account}${isDefault ? ' (default)' : ''}`);
+    }
+  } catch (error) {
+    console.error(
+      `Failed to list accounts: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 export {
+  handleAccountsList,
   handleAccountsRename,
   handleAccountsSetDefault,
   handleAccountsShow,

@@ -15,6 +15,7 @@ interface SecretsStore {
   has(ref: SecretReference): Promise<boolean>;
   delete(ref: SecretReference): Promise<void>;
   deleteAccount(ref: AccountReference): Promise<void>;
+  listAccounts(service: string): Promise<string[]>;
 }
 
 export type { AccountReference, SecretReference, SecretsStore };

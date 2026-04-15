@@ -199,6 +199,41 @@ function createOnePasswordStore(): SecretsStore {
       });
     },
 
+    async listAccounts(service: string): Promise<string[]> {
+      const { vault, account } = await opArgs('');
+      const tag = await getTag();
+      const tags = [tag, service].join(',');
+
+      const result = await exec('op', [
+        'item',
+        'list',
+        '--tags',
+        tags,
+        '--vault',
+        vault,
+        '--account',
+        account,
+        '--format',
+        'json',
+      ]);
+
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `Failed to list accounts for "${service}": ${result.stderr}`
+        );
+      }
+
+      const stdout = result.stdout.trim();
+      if (!stdout || stdout === 'null') {
+        return [];
+      }
+
+      const items = JSON.parse(stdout) as Array<{ title: string }>;
+      return items
+        .map((item) => item.title.split('/')[1])
+        .filter((acct): acct is string => acct !== undefined);
+    },
+
     async deleteAccount(ref: AccountReference): Promise<void> {
       const { vault, account } = await opArgs(ref.account);
       const title = `${ref.service}/${ref.account}`;

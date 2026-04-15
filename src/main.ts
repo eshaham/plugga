@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 
 import {
+  handleAccountsList,
   handleAccountsRename,
   handleAccountsSetDefault,
   handleAccountsShow,
@@ -190,6 +191,11 @@ program
 const accountsCmd = program
   .command('accounts')
   .description('Manage accounts for services');
+
+accountsCmd
+  .command('list <service>')
+  .description('List all accounts for a service')
+  .action((service: string) => handleAccountsList(service, store));
 
 accountsCmd
   .command('show <service>')

@@ -43,6 +43,16 @@ function createMockStore(initial?: Record<string, string>): SecretsStore {
       }
       return Promise.resolve();
     },
+    listAccounts(service: string): Promise<string[]> {
+      const accounts = new Set<string>();
+      for (const key of data.keys()) {
+        const parts = key.split('/');
+        if (parts[0] === service && parts[1] !== undefined) {
+          accounts.add(parts[1]);
+        }
+      }
+      return Promise.resolve([...accounts]);
+    },
   };
 }
 
