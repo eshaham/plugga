@@ -128,6 +128,8 @@ function createOnePasswordStore(): SecretsStore {
         '--fields',
         `label=${ref.key}`,
         '--reveal',
+        '--format',
+        'json',
       ]);
 
       if (result.exitCode !== 0) {
@@ -136,12 +138,33 @@ function createOnePasswordStore(): SecretsStore {
         );
       }
 
+      let field: unknown;
+      try {
+        field = JSON.parse(result.stdout) as unknown;
+      } catch {
+        throw new Error(
+          `Failed to parse op output for "${ref.key}" (${ref.service}/${ref.account}): ${result.stderr || result.stdout}`
+        );
+      }
+
+      if (
+        typeof field !== 'object' ||
+        field === null ||
+        typeof (field as Record<string, unknown>)['value'] !== 'string'
+      ) {
+        throw new Error(
+          `Unexpected op output shape for "${ref.key}" (${ref.service}/${ref.account})`
+        );
+      }
+
+      const { value } = field as { value: string };
+
       await logInfo('secrets.get', {
         service: ref.service,
         account: ref.account,
         key: ref.key,
       });
-      return result.stdout;
+      return value;
     },
 
     async set(ref: SecretReference, value: string): Promise<void> {
