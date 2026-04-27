@@ -128,6 +128,8 @@ function createOnePasswordStore(): SecretsStore {
         '--fields',
         `label=${ref.key}`,
         '--reveal',
+        '--format',
+        'json',
       ]);
 
       if (result.exitCode !== 0) {
@@ -136,12 +138,14 @@ function createOnePasswordStore(): SecretsStore {
         );
       }
 
+      const field = JSON.parse(result.stdout) as { value: string };
+
       await logInfo('secrets.get', {
         service: ref.service,
         account: ref.account,
         key: ref.key,
       });
-      return result.stdout;
+      return field.value;
     },
 
     async set(ref: SecretReference, value: string): Promise<void> {
