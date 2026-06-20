@@ -483,6 +483,78 @@ describe('handleSetup', () => {
     });
   });
 
+  describe('worktree setup', () => {
+    function mockWorktree(mainRoot: string, worktreeRoot: string): void {
+      mockExec.mockImplementation((_cmd, args) => {
+        if (args.includes('--show-toplevel')) {
+          return Promise.resolve({
+            stdout: worktreeRoot,
+            stderr: '',
+            exitCode: 0,
+          });
+        }
+        if (args.includes('--git-common-dir')) {
+          return Promise.resolve({
+            stdout: `${worktreeRoot}/.git/worktrees/wt\n${mainRoot}/.git`,
+            stderr: '',
+            exitCode: 0,
+          });
+        }
+        if (args[0] === 'worktree') {
+          return Promise.resolve({
+            stdout: `worktree ${mainRoot}\nHEAD abc\n`,
+            stderr: '',
+            exitCode: 0,
+          });
+        }
+        return Promise.resolve({ stdout: '', stderr: '', exitCode: 0 });
+      });
+    }
+
+    it('writes to the main repo and copies into the worktree', async () => {
+      const mainRoot = resolve(tempDir, 'main');
+      const worktreeRoot = resolve(tempDir, 'wt');
+      await mkdir(mainRoot, { recursive: true });
+      await mkdir(worktreeRoot, { recursive: true });
+      mockWorktree(mainRoot, worktreeRoot);
+
+      const recipe = makeSkillRecipe();
+      const store = createMockStore({
+        'github/myaccount/api-key': 'secret123',
+      });
+      mockResolveAccount.mockResolvedValue('myaccount');
+      mockLoadRecipe.mockResolvedValue(recipe);
+      mockLoadSkillContent.mockResolvedValue('# Skill');
+
+      await handleSetup(
+        { recipe: 'test-skill', projectDir: worktreeRoot },
+        store
+      );
+
+      const mainSettings = JSON.parse(
+        await readFile(
+          resolve(mainRoot, '.claude', 'settings.local.json'),
+          'utf-8'
+        )
+      ) as { env: Record<string, string> };
+      const worktreeSettings = JSON.parse(
+        await readFile(
+          resolve(worktreeRoot, '.claude', 'settings.local.json'),
+          'utf-8'
+        )
+      ) as { env: Record<string, string> };
+
+      expect(mainSettings.env['GITHUB_TOKEN']).toBe('secret123');
+      expect(worktreeSettings.env['GITHUB_TOKEN']).toBe('secret123');
+
+      const worktreeSkill = await readFile(
+        resolve(worktreeRoot, '.claude', 'skills', 'test-skill', 'SKILL.md'),
+        'utf-8'
+      );
+      expect(worktreeSkill).toBe('# Skill');
+    });
+  });
+
   describe('error handling', () => {
     it('should log error and print message when setup fails', async () => {
       const consoleSpy = jest.spyOn(console, 'error');
