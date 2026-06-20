@@ -6,7 +6,15 @@ import { readClaudeJson, writeClaudeJson } from '~/config/claude-json';
 import { registerProject } from '~/config/projects-registry';
 import { getVariablesForAccount } from '~/config/variables';
 import { exec } from '~/exec/runner';
+import {
+  SETTINGS_LOCAL_INCLUDE_ENTRY,
+  addSettingsLocalInclude,
+  copyConfigToWorktree,
+  getWorktreeInfo,
+  hasSettingsLocalInclude,
+} from '~/git/worktree';
 import { logError, logInfo } from '~/logging/logger';
+import { confirm } from '~/prompt/confirm';
 import { loadRecipe, loadSkillContent } from '~/recipes/recipe-loader';
 import type { McpRecipe, Recipe, SkillRecipe } from '~/recipes/types';
 import type { SecretsStore } from '~/secrets/types';
@@ -307,6 +315,27 @@ async function checkGitignore(projectDir: string): Promise<void> {
   }
 }
 
+async function ensureWorktreeInclude(mainRoot: string): Promise<void> {
+  if (await hasSettingsLocalInclude(mainRoot)) {
+    return;
+  }
+
+  console.log(
+    `Tip: ${SETTINGS_LOCAL_INCLUDE_ENTRY} is not in .worktreeinclude, so new worktrees won't receive your secrets automatically.`
+  );
+  const shouldAdd = await confirm(
+    `Add ${SETTINGS_LOCAL_INCLUDE_ENTRY} to .worktreeinclude now?`
+  );
+  if (shouldAdd) {
+    await addSettingsLocalInclude(mainRoot);
+    console.log(`Added ${SETTINGS_LOCAL_INCLUDE_ENTRY} to .worktreeinclude`);
+  } else {
+    console.log(
+      'Skipped. You can configure this later by running /setup-worktrees.'
+    );
+  }
+}
+
 async function handleSetup(
   input: SetupInput,
   store: SecretsStore
@@ -316,7 +345,18 @@ async function handleSetup(
     const account = await resolveAccount(recipe.service, input.account);
     const secrets = await resolveSecrets(recipe, account, store);
 
-    const state = await loadProjectState(input.projectDir);
+    const worktree =
+      recipe.type === 'skill' ? await getWorktreeInfo(input.projectDir) : null;
+    const activeWorktree = worktree?.isWorktree ? worktree : null;
+    const setupDir = activeWorktree?.mainRoot ?? input.projectDir;
+
+    if (activeWorktree) {
+      console.log(
+        `Detected a git worktree. Setting up in the main repo (${activeWorktree.mainRoot}) and copying into the worktree.`
+      );
+    }
+
+    const state = await loadProjectState(setupDir);
     const existingAccounts = getRecipeAccounts(state, input.recipe);
 
     if (existingAccounts.includes(account)) {
@@ -328,21 +368,24 @@ async function handleSetup(
     if (recipe.type === 'mcp') {
       await setupMcp(recipe, secrets, account, input.projectDir);
     } else if (recipe.type === 'skill') {
-      await setupSkill(
-        recipe,
-        secrets,
-        account,
-        existingAccounts,
-        input.projectDir
-      );
+      await setupSkill(recipe, secrets, account, existingAccounts, setupDir);
     }
 
     const updatedState = addRecipeAccount(state, input.recipe, account);
-    await saveProjectState(input.projectDir, updatedState);
-    await registerProject(input.projectDir, input.recipe);
+    await saveProjectState(setupDir, updatedState);
+    await registerProject(setupDir, input.recipe);
 
     if (recipe.type === 'skill') {
-      await checkGitignore(input.projectDir);
+      await checkGitignore(setupDir);
+    }
+
+    if (activeWorktree) {
+      await copyConfigToWorktree(
+        activeWorktree.mainRoot,
+        activeWorktree.worktreeRoot,
+        input.recipe
+      );
+      await ensureWorktreeInclude(activeWorktree.mainRoot);
     }
 
     console.log(`Setup complete for ${input.recipe}/${account}`);
