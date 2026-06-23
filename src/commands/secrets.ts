@@ -1,4 +1,5 @@
 import { logError, logInfo } from '~/logging/logger';
+import { errorMessage, printJson, printJsonError } from '~/output';
 import type { SecretsStore } from '~/secrets/types';
 
 interface SecretsSetInput {
@@ -12,6 +13,7 @@ interface SecretsGetInput {
   service: string;
   account?: string;
   name?: string;
+  json?: boolean;
 }
 
 interface SecretsDeleteInput {
@@ -58,9 +60,13 @@ async function handleSecretsGet(
 ): Promise<void> {
   const account = input.account;
   if (!account) {
-    console.error(
-      'No account specified. Use --account or set a default with "plugga accounts set-default".'
-    );
+    const message =
+      'No account specified. Use --account or set a default with "plugga accounts set-default".';
+    if (input.json) {
+      printJsonError(message);
+    } else {
+      console.error(message);
+    }
     return;
   }
 
@@ -71,7 +77,22 @@ async function handleSecretsGet(
         account,
         key: input.name,
       });
-      console.log(`${input.name}: ${value}`);
+      if (input.json) {
+        printJson({
+          service: input.service,
+          account,
+          name: input.name,
+          value,
+        });
+      } else {
+        console.log(`${input.name}: ${value}`);
+      }
+    } else if (input.json) {
+      printJson({
+        service: input.service,
+        account,
+        message: 'Use --name to retrieve a specific secret value.',
+      });
     } else {
       console.log(`Secrets for ${input.service}/${account}:`);
       console.log('(Use --name to retrieve a specific secret)');
@@ -87,9 +108,12 @@ async function handleSecretsGet(
       account,
       name: input.name,
     });
-    console.error(
-      `Failed to get secret: ${error instanceof Error ? error.message : String(error)}`
-    );
+    const message = `Failed to get secret: ${errorMessage(error)}`;
+    if (input.json) {
+      printJsonError(message);
+    } else {
+      console.error(message);
+    }
   }
 }
 

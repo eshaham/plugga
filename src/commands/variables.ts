@@ -1,5 +1,6 @@
 import { getVariablesForAccount, setVariable } from '~/config/variables';
 import { logError, logInfo } from '~/logging/logger';
+import { errorMessage, printJson, printJsonError } from '~/output';
 
 interface VariablesSetInput {
   service: string;
@@ -11,6 +12,7 @@ interface VariablesSetInput {
 interface VariablesGetInput {
   service: string;
   account?: string;
+  json?: boolean;
 }
 
 async function handleVariablesSet(input: VariablesSetInput): Promise<void> {
@@ -38,9 +40,13 @@ async function handleVariablesSet(input: VariablesSetInput): Promise<void> {
 
 async function handleVariablesGet(input: VariablesGetInput): Promise<void> {
   if (!input.account) {
-    console.error(
-      'No account specified. Use --account or set a default with "plugga accounts set-default".'
-    );
+    const message =
+      'No account specified. Use --account or set a default with "plugga accounts set-default".';
+    if (input.json) {
+      printJsonError(message);
+    } else {
+      console.error(message);
+    }
     return;
   }
 
@@ -51,13 +57,18 @@ async function handleVariablesGet(input: VariablesGetInput): Promise<void> {
     );
     const entries = Object.entries(variables);
 
-    if (entries.length === 0) {
+    if (input.json) {
+      printJson({
+        service: input.service,
+        account: input.account,
+        variables,
+      });
+    } else if (entries.length === 0) {
       console.log(`No variables set for ${input.service}/${input.account}`);
-      return;
-    }
-
-    for (const [name, value] of entries) {
-      console.log(`${name}: ${value}`);
+    } else {
+      for (const [name, value] of entries) {
+        console.log(`${name}: ${value}`);
+      }
     }
     await logInfo('variables.get', {
       service: input.service,
@@ -68,9 +79,12 @@ async function handleVariablesGet(input: VariablesGetInput): Promise<void> {
       service: input.service,
       account: input.account,
     });
-    console.error(
-      `Failed to get variables: ${error instanceof Error ? error.message : String(error)}`
-    );
+    const message = `Failed to get variables: ${errorMessage(error)}`;
+    if (input.json) {
+      printJsonError(message);
+    } else {
+      console.error(message);
+    }
   }
 }
 

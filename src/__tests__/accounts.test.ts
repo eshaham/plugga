@@ -176,6 +176,25 @@ describe('handleAccountsShow', () => {
       expect.stringContaining('No default account')
     );
   });
+
+  it('should show default account as JSON', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await setDefaultAccount('github', 'myaccount');
+    await handleAccountsShow('github', { json: true });
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      service: 'github',
+      default: 'myaccount',
+    });
+  });
+
+  it('should show null default as JSON when not set', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await handleAccountsShow('github', { json: true });
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      service: 'github',
+      default: null,
+    });
+  });
 });
 
 describe('handleAccountsSetDefault', () => {
@@ -379,5 +398,50 @@ describe('handleAccountsList', () => {
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('Failed to list accounts')
     );
+  });
+
+  it('should list accounts as JSON with default flag', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await setDefaultAccount('github', 'personal');
+    const store = createMockStore({
+      'github/personal/api-key': 'token1',
+      'github/work/api-key': 'token2',
+    });
+
+    await handleAccountsList('github', store, { json: true });
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      service: 'github',
+      accounts: [
+        { name: 'personal', default: true },
+        { name: 'work', default: false },
+      ],
+    });
+  });
+
+  it('should list empty accounts as JSON', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const store = createMockStore({});
+
+    await handleAccountsList('github', store, { json: true });
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      service: 'github',
+      accounts: [],
+    });
+  });
+
+  it('should print error as JSON when store throws', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const store = createMockStore({});
+    jest.spyOn(store, 'listAccounts').mockRejectedValue(new Error('op failed'));
+
+    await handleAccountsList('github', store, { json: true });
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      error: expect.stringContaining('Failed to list accounts'),
+    });
   });
 });

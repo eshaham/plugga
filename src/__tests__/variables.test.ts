@@ -1,7 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { handleVariablesGet } from '~/commands/variables';
 import {
   getVariable,
   getVariablesForAccount,
@@ -96,5 +104,57 @@ describe('variables', () => {
     );
     const result = await loadVariables();
     expect(result).toEqual({});
+  });
+});
+
+describe('variables get --json', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should print variables as JSON', async () => {
+    await setVariable('github', 'myaccount', 'org', 'my-org');
+    await setVariable('github', 'myaccount', 'repo', 'my-repo');
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await handleVariablesGet({
+      service: 'github',
+      account: 'myaccount',
+      json: true,
+    });
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      service: 'github',
+      account: 'myaccount',
+      variables: { org: 'my-org', repo: 'my-repo' },
+    });
+  });
+
+  it('should print empty variables object as JSON', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await handleVariablesGet({
+      service: 'github',
+      account: 'empty',
+      json: true,
+    });
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      service: 'github',
+      account: 'empty',
+      variables: {},
+    });
+  });
+
+  it('should print error as JSON when no account specified', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await handleVariablesGet({ service: 'github', json: true });
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      error: expect.stringContaining('No account specified'),
+    });
   });
 });

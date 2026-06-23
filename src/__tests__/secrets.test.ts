@@ -120,6 +120,70 @@ describe('secrets get', () => {
 
     expect(consoleSpy).toHaveBeenCalledWith('api-key: abc123');
   });
+
+  it('should print a specific secret as JSON', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const store = createMockStore({ 'github/personal/api-key': 'abc123' });
+
+    await handleSecretsGet(
+      { service: 'github', account: 'personal', name: 'api-key', json: true },
+      store
+    );
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      service: 'github',
+      account: 'personal',
+      name: 'api-key',
+      value: 'abc123',
+    });
+  });
+
+  it('should round-trip multi-line and colon-containing values as JSON', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const value =
+      '-----BEGIN KEY-----\nline: with colon\nfoo\n-----END KEY-----';
+    const store = createMockStore({ 'gcp/prod/credentials': value });
+
+    await handleSecretsGet(
+      { service: 'gcp', account: 'prod', name: 'credentials', json: true },
+      store
+    );
+
+    expect(
+      (JSON.parse(consoleSpy.mock.calls[0]?.[0] as string) as { value: string })
+        .value
+    ).toBe(value);
+  });
+
+  it('should print error as JSON when no account specified', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const store = createMockStore();
+
+    await handleSecretsGet({ service: 'github', json: true }, store);
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      error: expect.stringContaining('No account specified'),
+    });
+  });
+
+  it('should print error as JSON on failure', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const store = createMockStore();
+    jest.spyOn(store, 'get').mockRejectedValue(new Error('op failed'));
+
+    await handleSecretsGet(
+      { service: 'github', account: 'personal', name: 'api-key', json: true },
+      store
+    );
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      error: expect.stringContaining('Failed to get secret'),
+    });
+  });
 });
 
 describe('secrets delete', () => {

@@ -1,4 +1,5 @@
 import { logInfo } from '~/logging/logger';
+import { printJson, printJsonError } from '~/output';
 import {
   getRecipeDir,
   listRecipes,
@@ -14,8 +15,22 @@ interface AddRecipeInput {
   description: string;
 }
 
-async function handleRecipesList(): Promise<void> {
+async function handleRecipesList(
+  options: { json?: boolean } = {}
+): Promise<void> {
   const all = await listRecipes();
+
+  if (options.json) {
+    printJson({
+      recipes: all.map((recipe) => ({
+        name: recipe.name,
+        type: recipe.type,
+        service: recipe.service,
+        description: recipe.description,
+      })),
+    });
+    return;
+  }
 
   if (all.length === 0) {
     console.log('No recipes found. Use "plugga recipes add" to create one.');
@@ -65,14 +80,21 @@ async function handleRecipesAdd(input: AddRecipeInput): Promise<void> {
   await logInfo('recipes.add', { name: input.name, type: input.type });
 }
 
-async function handleRecipesShow(name: string): Promise<void> {
+async function handleRecipesShow(
+  name: string,
+  options: { json?: boolean } = {}
+): Promise<void> {
   try {
     const recipe = await loadRecipe(name);
     console.log(JSON.stringify(recipe, null, 2));
   } catch (error) {
-    console.error(
-      error instanceof Error ? error.message : `Recipe "${name}" not found`
-    );
+    const message =
+      error instanceof Error ? error.message : `Recipe "${name}" not found`;
+    if (options.json) {
+      printJsonError(message);
+    } else {
+      console.error(message);
+    }
   }
 }
 

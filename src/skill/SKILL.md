@@ -37,16 +37,18 @@ Non-interactive command that installs or updates this skill at `~/.claude/skills
 ### Manage Recipes
 
 ```bash
-plugga recipes list
+plugga recipes list [--json]
 plugga recipes add <name> --type <mcp|skill> [--service <service>] --description <desc>
-plugga recipes show <name>
+plugga recipes show <name> [--json]
 ```
+
+> **Reading values programmatically:** the read commands (`recipes list`, `recipes show`, `secrets get`, `variables get`, `accounts list`, `accounts show`) accept a `--json` flag that emits a single machine-readable JSON object instead of human text. **Always pass `--json` when you need to extract a value** — parse the JSON rather than splitting `key: value` lines, since secret values can contain colons, spaces, or newlines. On failure, `--json` emits `{ "error": "..." }`.
 
 ### Manage Secrets
 
 ```bash
 plugga secrets set --service <s> --account <a> --name <n> --value <v>
-plugga secrets get --service <s> [--account <a>] [--name <n>]
+plugga secrets get --service <s> [--account <a>] [--name <n>] [--json]
 plugga secrets delete --service <s> --account <a> --name <n>
 plugga secrets delete-account --service <s> --account <a>
 ```
@@ -59,7 +61,7 @@ Secrets are stored in 1Password as concealed fields within items named `<service
 
 ```bash
 plugga variables set --service <s> --account <a> --name <n> --value <v>
-plugga variables get --service <s> [--account <a>]
+plugga variables get --service <s> [--account <a>] [--json]
 ```
 
 Variables are non-sensitive configuration stored locally (not in 1Password).
@@ -67,8 +69,8 @@ Variables are non-sensitive configuration stored locally (not in 1Password).
 ### Manage Accounts
 
 ```bash
-plugga accounts list <service>
-plugga accounts show <service>
+plugga accounts list <service> [--json]
+plugga accounts show <service> [--json]
 plugga accounts set-default <service> <account>
 plugga accounts unset-default <service>
 plugga accounts rename --service <s> --old-name <o> --new-name <n>
