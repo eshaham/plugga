@@ -48,7 +48,8 @@ const recipes = program.command('recipes').description('Manage recipes');
 recipes
   .command('list')
   .description('List all available recipes')
-  .action(() => handleRecipesList());
+  .option('--json', 'Output machine-readable JSON')
+  .action((opts) => handleRecipesList({ json: opts.json as boolean }));
 
 recipes
   .command('add <name>')
@@ -68,7 +69,10 @@ recipes
 recipes
   .command('show <name>')
   .description('Show recipe details')
-  .action((name: string) => handleRecipesShow(name));
+  .option('--json', 'Output machine-readable JSON')
+  .action((name: string, opts) =>
+    handleRecipesShow(name, { json: opts.json as boolean })
+  );
 
 const secrets = program.command('secrets').description('Manage secrets');
 
@@ -97,12 +101,14 @@ secrets
   .requiredOption('--service <service>', 'Service name')
   .option('--account <account>', 'Account name (uses default if omitted)')
   .option('--name <name>', 'Specific secret name')
+  .option('--json', 'Output machine-readable JSON')
   .action((opts) =>
     handleSecretsGet(
       {
         service: opts.service as string,
         account: opts.account as string | undefined,
         name: opts.name as string | undefined,
+        json: opts.json as boolean,
       },
       store
     )
@@ -165,10 +171,12 @@ variables
   .description('Retrieve variables for a service and account')
   .requiredOption('--service <service>', 'Service name')
   .option('--account <account>', 'Account name (uses default if omitted)')
+  .option('--json', 'Output machine-readable JSON')
   .action((opts) =>
     handleVariablesGet({
       service: opts.service as string,
       account: opts.account as string | undefined,
+      json: opts.json as boolean,
     })
   );
 
@@ -195,12 +203,18 @@ const accountsCmd = program
 accountsCmd
   .command('list <service>')
   .description('List all accounts for a service')
-  .action((service: string) => handleAccountsList(service, store));
+  .option('--json', 'Output machine-readable JSON')
+  .action((service: string, opts) =>
+    handleAccountsList(service, store, { json: opts.json as boolean })
+  );
 
 accountsCmd
   .command('show <service>')
   .description('Show default account for a service')
-  .action((service: string) => handleAccountsShow(service));
+  .option('--json', 'Output machine-readable JSON')
+  .action((service: string, opts) =>
+    handleAccountsShow(service, { json: opts.json as boolean })
+  );
 
 accountsCmd
   .command('set-default <service> <account>')

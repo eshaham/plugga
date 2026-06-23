@@ -54,8 +54,11 @@ plugga secrets set \
 plugga secrets get \
   --service <s> \
   [--account <a>] \
-  [--name <n>]                  # Retrieve secrets
+  [--name <n>] \
+  [--json]                      # Retrieve secrets (--json for machine-readable output)
 ```
+
+The read commands (`recipes list`, `recipes show`, `secrets get`, `variables get`, `accounts list`, `accounts show`) accept `--json` to emit a single JSON object instead of human-readable text. Use it when consuming output programmatically — secret values can contain colons or newlines that make line-based parsing unreliable. On failure, `--json` emits `{ "error": "..." }`.
 
 ### Variables
 
@@ -66,7 +69,8 @@ plugga variables set \
 
 plugga variables get \
   --service <s> \
-  [--account <a>]               # Retrieve variables
+  [--account <a>] \
+  [--json]                      # Retrieve variables (--json for machine-readable output)
 ```
 
 ### Accounts

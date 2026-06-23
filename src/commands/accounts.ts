@@ -8,6 +8,7 @@ import {
 import { renameMcpEntry } from '~/config/claude-json';
 import { loadProjectsRegistry } from '~/config/projects-registry';
 import { logInfo } from '~/logging/logger';
+import { errorMessage, printJson, printJsonError } from '~/output';
 import { loadRecipe } from '~/recipes/recipe-loader';
 import type { SecretsStore } from '~/secrets/types';
 
@@ -117,8 +118,15 @@ async function handleAccountsRename(input: AccountsRenameInput): Promise<void> {
   });
 }
 
-async function handleAccountsShow(service: string): Promise<void> {
+async function handleAccountsShow(
+  service: string,
+  options: { json?: boolean } = {}
+): Promise<void> {
   const defaultAccount = await getDefaultAccount(service);
+  if (options.json) {
+    printJson({ service, default: defaultAccount ?? null });
+    return;
+  }
   if (defaultAccount) {
     console.log(`Default account for "${service}": ${defaultAccount}`);
   } else {
@@ -128,24 +136,38 @@ async function handleAccountsShow(service: string): Promise<void> {
 
 async function handleAccountsList(
   service: string,
-  store: SecretsStore
+  store: SecretsStore,
+  options: { json?: boolean } = {}
 ): Promise<void> {
   try {
     const accounts = await store.listAccounts(service);
+    const defaultAccount = await getDefaultAccount(service);
+    if (options.json) {
+      printJson({
+        service,
+        accounts: accounts.map((account) => ({
+          name: account,
+          default: account === defaultAccount,
+        })),
+      });
+      return;
+    }
     if (accounts.length === 0) {
       console.log(`No accounts found for service "${service}"`);
       return;
     }
-    const defaultAccount = await getDefaultAccount(service);
     console.log(`Accounts for ${service}:`);
     for (const account of accounts) {
       const isDefault = account === defaultAccount;
       console.log(`  ${account}${isDefault ? ' (default)' : ''}`);
     }
   } catch (error) {
-    console.error(
-      `Failed to list accounts: ${error instanceof Error ? error.message : String(error)}`
-    );
+    const message = `Failed to list accounts: ${errorMessage(error)}`;
+    if (options.json) {
+      printJsonError(message);
+    } else {
+      console.error(message);
+    }
   }
 }
 
