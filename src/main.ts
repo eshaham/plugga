@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   handleAccountsList,
@@ -29,6 +32,15 @@ import { createOnePasswordStore } from '~/secrets/one-password-store';
 
 const store = createOnePasswordStore();
 
+const packageJsonPath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'package.json'
+);
+const { version } = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
+  version: string;
+};
+
 const program = new Command();
 
 program
@@ -36,7 +48,7 @@ program
   .description(
     'Centralized CLI for managing service integrations and secrets across projects'
   )
-  .version('0.1.0');
+  .version(version);
 
 program
   .command('init')
