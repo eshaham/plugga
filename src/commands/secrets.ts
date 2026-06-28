@@ -67,6 +67,7 @@ async function handleSecretsGet(
     } else {
       console.error(message);
     }
+    process.exitCode = 1;
     return;
   }
 
@@ -114,6 +115,7 @@ async function handleSecretsGet(
     } else {
       console.error(message);
     }
+    process.exitCode = 1;
   }
 }
 

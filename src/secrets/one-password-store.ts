@@ -1,8 +1,35 @@
 import { getTag, resolveProfile } from '~/config/profiles';
 import { exec } from '~/exec/runner';
+import type { ExecResult } from '~/exec/runner';
 import { logError, logInfo } from '~/logging/logger';
 
 import type { AccountReference, SecretReference, SecretsStore } from './types';
+
+const TRANSIENT_OP_ERROR =
+  /promptError|error initializing client|connecting to desktop app|session.*(expired|timed out)|not currently signed in/i;
+
+const OP_RETRY_DELAY_MS = 300;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientOpError(result: ExecResult): boolean {
+  return result.exitCode !== 0 && TRANSIENT_OP_ERROR.test(result.stderr);
+}
+
+async function execOp(args: string[], retries = 1): Promise<ExecResult> {
+  let result = await exec('op', args);
+  for (
+    let attempt = 0;
+    attempt < retries && isTransientOpError(result);
+    attempt += 1
+  ) {
+    await delay(OP_RETRY_DELAY_MS * (attempt + 1));
+    result = await exec('op', args);
+  }
+  return result;
+}
 
 function itemTitle(ref: SecretReference): string {
   return `${ref.service}/${ref.account}`;
@@ -19,7 +46,7 @@ async function itemExists(
   ref: SecretReference
 ): Promise<{ exists: boolean; hasField: boolean }> {
   const { vault, account } = await opArgs(ref.account);
-  const result = await exec('op', [
+  const result = await execOp([
     'item',
     'get',
     itemTitle(ref),
@@ -51,7 +78,7 @@ async function createItem(ref: SecretReference, value: string): Promise<void> {
   const tag = await getTag();
   const tags = [tag, ref.service].join(',');
 
-  const result = await exec('op', [
+  const result = await execOp([
     'item',
     'create',
     '--category',
@@ -78,7 +105,7 @@ async function addFieldToItem(
 ): Promise<void> {
   const { vault, account } = await opArgs(ref.account);
 
-  const result = await exec('op', [
+  const result = await execOp([
     'item',
     'edit',
     itemTitle(ref),
@@ -97,7 +124,7 @@ async function addFieldToItem(
 async function editField(ref: SecretReference, value: string): Promise<void> {
   const { vault, account } = await opArgs(ref.account);
 
-  const result = await exec('op', [
+  const result = await execOp([
     'item',
     'edit',
     itemTitle(ref),
@@ -117,7 +144,7 @@ function createOnePasswordStore(): SecretsStore {
   return {
     async get(ref: SecretReference): Promise<string> {
       const { vault, account } = await opArgs(ref.account);
-      const result = await exec('op', [
+      const result = await execOp([
         'item',
         'get',
         itemTitle(ref),
@@ -159,6 +186,12 @@ function createOnePasswordStore(): SecretsStore {
 
       const { value } = field as { value: string };
 
+      if (value === '') {
+        throw new Error(
+          `Secret "${ref.key}" is empty for ${ref.service}/${ref.account}`
+        );
+      }
+
       await logInfo('secrets.get', {
         service: ref.service,
         account: ref.account,
@@ -192,7 +225,7 @@ function createOnePasswordStore(): SecretsStore {
 
     async delete(ref: SecretReference): Promise<void> {
       const { vault, account } = await opArgs(ref.account);
-      const result = await exec('op', [
+      const result = await execOp([
         'item',
         'edit',
         itemTitle(ref),
@@ -227,7 +260,7 @@ function createOnePasswordStore(): SecretsStore {
       const tag = await getTag();
       const tags = [tag, service].join(',');
 
-      const result = await exec('op', [
+      const result = await execOp([
         'item',
         'list',
         '--tags',
@@ -260,7 +293,7 @@ function createOnePasswordStore(): SecretsStore {
     async deleteAccount(ref: AccountReference): Promise<void> {
       const { vault, account } = await opArgs(ref.account);
       const title = `${ref.service}/${ref.account}`;
-      const result = await exec('op', [
+      const result = await execOp([
         'item',
         'delete',
         title,
