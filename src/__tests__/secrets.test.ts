@@ -34,14 +34,18 @@ const {
   handleSecretsSet,
 } = await import('~/commands/secrets');
 
+const originalExitCode = process.exitCode;
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockLogInfo.mockResolvedValue(undefined);
   mockLogError.mockResolvedValue(undefined);
+  process.exitCode = 0;
 });
 
 afterEach(() => {
   jest.restoreAllMocks();
+  process.exitCode = originalExitCode;
 });
 
 describe('secrets set', () => {
@@ -107,6 +111,7 @@ describe('secrets get', () => {
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('No account specified')
     );
+    expect(process.exitCode).toBe(1);
   });
 
   it('should get and print a specific secret', async () => {
@@ -119,6 +124,25 @@ describe('secrets get', () => {
     );
 
     expect(consoleSpy).toHaveBeenCalledWith('api-key: abc123');
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('should set a non-zero exit code when the read fails', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const store = createMockStore();
+    jest.spyOn(store, 'get').mockRejectedValue(new Error('op failed'));
+
+    await handleSecretsGet(
+      { service: 'github', account: 'personal', name: 'api-key' },
+      store
+    );
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to get secret')
+    );
+    expect(process.exitCode).toBe(1);
   });
 
   it('should print a specific secret as JSON', async () => {
