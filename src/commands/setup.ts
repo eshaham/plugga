@@ -1,7 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { getDefaultAccount, resolveAccount } from '~/config/accounts';
 import { readClaudeJson, writeClaudeJson } from '~/config/claude-json';
 import { registerProject } from '~/config/projects-registry';
 import { getVariablesForAccount } from '~/config/variables';
@@ -91,9 +90,7 @@ async function setupMcp(
   const mcpServers =
     (projectEntry['mcpServers'] as Record<string, unknown>) ?? {};
 
-  const defaultAccount = await getDefaultAccount(recipe.service);
-  const serverName =
-    account === defaultAccount ? recipe.name : `${recipe.name}-${account}`;
+  const serverName = `${recipe.name}-${account}`;
   const { mcp } = recipe;
 
   if (mcp.transport === 'stdio') {
@@ -342,7 +339,10 @@ async function handleSetup(
 ): Promise<void> {
   try {
     const recipe = await loadRecipe(input.recipe);
-    const account = await resolveAccount(recipe.service, input.account);
+    const account = input.account;
+    if (!account) {
+      throw new Error('No account specified. Use --account.');
+    }
     const secrets = await resolveSecrets(recipe, account, store);
 
     const worktree =

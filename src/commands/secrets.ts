@@ -60,8 +60,7 @@ async function handleSecretsGet(
 ): Promise<void> {
   const account = input.account;
   if (!account) {
-    const message =
-      'No account specified. Use --account or set a default with "plugga accounts set-default".';
+    const message = 'No account specified. Use --account.';
     if (input.json) {
       printJsonError(message);
     } else {

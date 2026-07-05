@@ -6,12 +6,10 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import { mkdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 
 import type { McpRecipe } from '~/recipes/types';
 
-import { cleanupTempDir, createMockStore, createTempDir } from './test-helpers';
+import { createMockStore } from './test-helpers';
 
 const mockRenameMcpEntry =
   jest.fn<
@@ -24,6 +22,13 @@ const mockLoadProjectState =
     (
       projectDir: string
     ) => Promise<{ recipes: Record<string, { accounts: string[] }> }>
+  >();
+const mockSaveProjectState =
+  jest.fn<
+    (
+      projectDir: string,
+      state: { recipes: Record<string, { accounts: string[] }> }
+    ) => Promise<void>
   >();
 const mockLoadRecipe = jest.fn<(name: string) => Promise<McpRecipe>>();
 const mockLogInfo =
@@ -41,6 +46,7 @@ jest.unstable_mockModule('~/config/projects-registry', () => ({
 
 jest.unstable_mockModule('~/commands/project-state', () => ({
   loadProjectState: mockLoadProjectState,
+  saveProjectState: mockSaveProjectState,
   getRecipeAccounts: (
     state: { recipes: Record<string, { accounts: string[] }> },
     recipeName: string
@@ -55,31 +61,14 @@ jest.unstable_mockModule('~/logging/logger', () => ({
   logInfo: mockLogInfo,
 }));
 
-const {
-  getDefaultAccount,
-  loadAccountsConfig,
-  resolveAccount,
-  setDefaultAccount,
-} = await import('~/config/accounts');
-const {
-  handleAccountsList,
-  handleAccountsSetDefault,
-  handleAccountsShow,
-  handleAccountsUnsetDefault,
-} = await import('~/commands/accounts');
+const { handleAccountsList, handleAccountsRename } =
+  await import('~/commands/accounts');
 
-let tempDir: string;
-let originalXdg: string | undefined;
-
-beforeEach(async () => {
-  tempDir = await createTempDir();
-  originalXdg = process.env['XDG_CONFIG_HOME'];
-  process.env['XDG_CONFIG_HOME'] = tempDir;
-  await mkdir(join(tempDir, 'plugga'), { recursive: true });
-
+beforeEach(() => {
   mockRenameMcpEntry.mockResolvedValue(true);
   mockLoadProjectsRegistry.mockResolvedValue({});
   mockLoadProjectState.mockResolvedValue({ recipes: {} });
+  mockSaveProjectState.mockResolvedValue(undefined);
   mockLoadRecipe.mockResolvedValue({
     name: 'my-recipe',
     service: 'github',
@@ -90,242 +79,8 @@ beforeEach(async () => {
   mockLogInfo.mockResolvedValue(undefined);
 });
 
-afterEach(async () => {
-  if (originalXdg === undefined) {
-    delete process.env['XDG_CONFIG_HOME'];
-  } else {
-    process.env['XDG_CONFIG_HOME'] = originalXdg;
-  }
-  await cleanupTempDir(tempDir);
-});
-
-describe('accounts', () => {
-  it('should return empty defaults when file does not exist', async () => {
-    const config = await loadAccountsConfig();
-    expect(config).toEqual({ defaults: {} });
-  });
-
-  it('should set and get default account', async () => {
-    await setDefaultAccount('github', 'myaccount');
-    const account = await getDefaultAccount('github');
-    expect(account).toBe('myaccount');
-  });
-
-  it('should persist accounts to disk', async () => {
-    await setDefaultAccount('github', 'myaccount');
-
-    const content = await readFile(
-      join(tempDir, 'plugga', 'accounts.json'),
-      'utf-8'
-    );
-    const parsed = JSON.parse(content);
-    expect(parsed).toEqual({ defaults: { github: 'myaccount' } });
-  });
-
-  it('should return undefined for missing service default', async () => {
-    const account = await getDefaultAccount('nonexistent');
-    expect(account).toBeUndefined();
-  });
-
-  it('should resolve explicit account without checking defaults', async () => {
-    const account = await resolveAccount('github', 'explicit');
-    expect(account).toBe('explicit');
-  });
-
-  it('should resolve to default account when no explicit account given', async () => {
-    await setDefaultAccount('github', 'default-acct');
-    const account = await resolveAccount('github', undefined);
-    expect(account).toBe('default-acct');
-  });
-
-  it('should throw when no explicit account and no default set', async () => {
-    await expect(resolveAccount('github', undefined)).rejects.toThrow(
-      'No account specified and no default account set for "github"'
-    );
-  });
-
-  it('should handle multiple services independently', async () => {
-    await setDefaultAccount('github', 'gh-acct');
-    await setDefaultAccount('slack', 'slack-acct');
-
-    expect(await getDefaultAccount('github')).toBe('gh-acct');
-    expect(await getDefaultAccount('slack')).toBe('slack-acct');
-  });
-
-  it('should overwrite existing default account', async () => {
-    await setDefaultAccount('github', 'old');
-    await setDefaultAccount('github', 'new');
-    expect(await getDefaultAccount('github')).toBe('new');
-  });
-});
-
-describe('handleAccountsShow', () => {
-  it('should show default account when set', async () => {
-    const consoleSpy = jest.spyOn(console, 'log');
-    await setDefaultAccount('github', 'myaccount');
-    await handleAccountsShow('github');
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('myaccount')
-    );
-  });
-
-  it('should show no default when not set', async () => {
-    const consoleSpy = jest.spyOn(console, 'log');
-    await handleAccountsShow('github');
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('No default account')
-    );
-  });
-
-  it('should show default account as JSON', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    await setDefaultAccount('github', 'myaccount');
-    await handleAccountsShow('github', { json: true });
-    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
-      service: 'github',
-      default: 'myaccount',
-    });
-  });
-
-  it('should show null default as JSON when not set', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    await handleAccountsShow('github', { json: true });
-    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
-      service: 'github',
-      default: null,
-    });
-  });
-});
-
-describe('handleAccountsSetDefault', () => {
-  it('should update the default account', async () => {
-    await handleAccountsSetDefault({ service: 'github', account: 'newacct' });
-    expect(await getDefaultAccount('github')).toBe('newacct');
-  });
-
-  it('should rename plain-named MCP entry to suffixed when changing default', async () => {
-    await setDefaultAccount('github', 'oldacct');
-    mockLoadProjectsRegistry.mockResolvedValue({
-      '/my/project': ['my-recipe'],
-    });
-    mockLoadProjectState.mockResolvedValue({
-      recipes: { 'my-recipe': { accounts: ['oldacct'] } },
-    });
-
-    await handleAccountsSetDefault({ service: 'github', account: 'newacct' });
-
-    expect(mockRenameMcpEntry).toHaveBeenCalledWith(
-      '/my/project',
-      'my-recipe',
-      'my-recipe-oldacct'
-    );
-  });
-
-  it('should rename suffixed new-default entry to plain when changing default', async () => {
-    await setDefaultAccount('github', 'oldacct');
-    mockLoadProjectsRegistry.mockResolvedValue({
-      '/my/project': ['my-recipe'],
-    });
-    mockLoadProjectState.mockResolvedValue({
-      recipes: { 'my-recipe': { accounts: ['oldacct', 'newacct'] } },
-    });
-
-    await handleAccountsSetDefault({ service: 'github', account: 'newacct' });
-
-    expect(mockRenameMcpEntry).toHaveBeenCalledWith(
-      '/my/project',
-      'my-recipe-newacct',
-      'my-recipe'
-    );
-  });
-
-  it('should not rename entries for other services', async () => {
-    mockLoadProjectsRegistry.mockResolvedValue({
-      '/my/project': ['my-recipe'],
-    });
-    mockLoadProjectState.mockResolvedValue({
-      recipes: { 'my-recipe': { accounts: ['oldacct'] } },
-    });
-    mockLoadRecipe.mockResolvedValue({
-      name: 'my-recipe',
-      service: 'linear',
-      type: 'mcp',
-      description: 'test',
-      mcp: { transport: 'stdio', command: 'npx', args: [] },
-    });
-
-    await handleAccountsSetDefault({ service: 'github', account: 'newacct' });
-
-    expect(mockRenameMcpEntry).not.toHaveBeenCalled();
-  });
-
-  it('should skip non-mcp recipes', async () => {
-    mockLoadProjectsRegistry.mockResolvedValue({
-      '/my/project': ['my-recipe'],
-    });
-    mockLoadProjectState.mockResolvedValue({
-      recipes: { 'my-recipe': { accounts: ['oldacct'] } },
-    });
-    mockLoadRecipe.mockResolvedValue({
-      name: 'my-recipe',
-      service: 'github',
-      type: 'skill',
-      description: 'test',
-    } as unknown as McpRecipe);
-
-    await handleAccountsSetDefault({ service: 'github', account: 'newacct' });
-
-    expect(mockRenameMcpEntry).not.toHaveBeenCalled();
-  });
-});
-
-describe('handleAccountsUnsetDefault', () => {
-  it('should remove the default account', async () => {
-    await setDefaultAccount('github', 'myacct');
-    await handleAccountsUnsetDefault('github');
-    expect(await getDefaultAccount('github')).toBeUndefined();
-  });
-
-  it('should do nothing when no default is set', async () => {
-    const consoleSpy = jest.spyOn(console, 'log');
-    await handleAccountsUnsetDefault('github');
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('No default account set')
-    );
-    expect(mockRenameMcpEntry).not.toHaveBeenCalled();
-  });
-
-  it('should rename plain-named MCP entry to suffixed', async () => {
-    await setDefaultAccount('github', 'myacct');
-    mockLoadProjectsRegistry.mockResolvedValue({
-      '/my/project': ['my-recipe'],
-    });
-    mockLoadProjectState.mockResolvedValue({
-      recipes: { 'my-recipe': { accounts: ['myacct'] } },
-    });
-
-    await handleAccountsUnsetDefault('github');
-
-    expect(mockRenameMcpEntry).toHaveBeenCalledWith(
-      '/my/project',
-      'my-recipe',
-      'my-recipe-myacct'
-    );
-  });
-
-  it('should skip recipes not set up in the project', async () => {
-    await setDefaultAccount('github', 'myacct');
-    mockLoadProjectsRegistry.mockResolvedValue({
-      '/my/project': ['my-recipe'],
-    });
-    mockLoadProjectState.mockResolvedValue({
-      recipes: { 'my-recipe': { accounts: ['otheracct'] } },
-    });
-
-    await handleAccountsUnsetDefault('github');
-
-    expect(mockRenameMcpEntry).not.toHaveBeenCalled();
-  });
+afterEach(() => {
+  jest.clearAllMocks();
 });
 
 describe('handleAccountsList', () => {
@@ -343,23 +98,6 @@ describe('handleAccountsList', () => {
       expect.stringContaining('personal')
     );
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('work'));
-  });
-
-  it('should mark the default account', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    await setDefaultAccount('github', 'personal');
-    const store = createMockStore({
-      'github/personal/api-key': 'token1',
-      'github/work/api-key': 'token2',
-    });
-
-    await handleAccountsList('github', store);
-
-    const calls = consoleSpy.mock.calls.map((c) => String(c[0]));
-    const personalLine = calls.find((c) => c.includes('personal'));
-    const workLine = calls.find((c) => c.includes('work'));
-    expect(personalLine).toContain('(default)');
-    expect(workLine).not.toContain('(default)');
   });
 
   it('should show message when no accounts exist', async () => {
@@ -400,9 +138,8 @@ describe('handleAccountsList', () => {
     );
   });
 
-  it('should list accounts as JSON with default flag', async () => {
+  it('should list accounts as JSON', async () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    await setDefaultAccount('github', 'personal');
     const store = createMockStore({
       'github/personal/api-key': 'token1',
       'github/work/api-key': 'token2',
@@ -412,10 +149,7 @@ describe('handleAccountsList', () => {
 
     expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
       service: 'github',
-      accounts: [
-        { name: 'personal', default: true },
-        { name: 'work', default: false },
-      ],
+      accounts: [{ name: 'personal' }, { name: 'work' }],
     });
   });
 
@@ -442,6 +176,121 @@ describe('handleAccountsList', () => {
 
     expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
       error: expect.stringContaining('Failed to list accounts'),
+    });
+  });
+});
+
+describe('handleAccountsRename', () => {
+  it('should rename the MCP entry and project state across projects', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockLoadProjectsRegistry.mockResolvedValue({
+      '/my/project': ['my-recipe'],
+    });
+    mockLoadProjectState.mockResolvedValue({
+      recipes: { 'my-recipe': { accounts: ['oldacct'] } },
+    });
+
+    await handleAccountsRename({
+      service: 'github',
+      oldName: 'oldacct',
+      newName: 'newacct',
+    });
+
+    expect(mockRenameMcpEntry).toHaveBeenCalledWith(
+      '/my/project',
+      'my-recipe-oldacct',
+      'my-recipe-newacct'
+    );
+    expect(mockSaveProjectState).toHaveBeenCalledWith('/my/project', {
+      recipes: { 'my-recipe': { accounts: ['newacct'] } },
+    });
+  });
+
+  it('should not rename entries for other services', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockLoadProjectsRegistry.mockResolvedValue({
+      '/my/project': ['my-recipe'],
+    });
+    mockLoadProjectState.mockResolvedValue({
+      recipes: { 'my-recipe': { accounts: ['oldacct'] } },
+    });
+    mockLoadRecipe.mockResolvedValue({
+      name: 'my-recipe',
+      service: 'linear',
+      type: 'mcp',
+      description: 'test',
+      mcp: { transport: 'stdio', command: 'npx', args: [] },
+    });
+
+    await handleAccountsRename({
+      service: 'github',
+      oldName: 'oldacct',
+      newName: 'newacct',
+    });
+
+    expect(mockRenameMcpEntry).not.toHaveBeenCalled();
+    expect(mockSaveProjectState).not.toHaveBeenCalled();
+  });
+
+  it('should skip recipes where the account is not set up', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockLoadProjectsRegistry.mockResolvedValue({
+      '/my/project': ['my-recipe'],
+    });
+    mockLoadProjectState.mockResolvedValue({
+      recipes: { 'my-recipe': { accounts: ['otheracct'] } },
+    });
+
+    await handleAccountsRename({
+      service: 'github',
+      oldName: 'oldacct',
+      newName: 'newacct',
+    });
+
+    expect(mockRenameMcpEntry).not.toHaveBeenCalled();
+    expect(mockSaveProjectState).not.toHaveBeenCalled();
+  });
+
+  it('should update project state but not MCP entries for skill recipes', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockLoadProjectsRegistry.mockResolvedValue({
+      '/my/project': ['my-recipe'],
+    });
+    mockLoadProjectState.mockResolvedValue({
+      recipes: { 'my-recipe': { accounts: ['oldacct'] } },
+    });
+    mockLoadRecipe.mockResolvedValue({
+      name: 'my-recipe',
+      service: 'github',
+      type: 'skill',
+      description: 'test',
+    } as unknown as McpRecipe);
+
+    await handleAccountsRename({
+      service: 'github',
+      oldName: 'oldacct',
+      newName: 'newacct',
+    });
+
+    expect(mockRenameMcpEntry).not.toHaveBeenCalled();
+    expect(mockSaveProjectState).toHaveBeenCalledWith('/my/project', {
+      recipes: { 'my-recipe': { accounts: ['newacct'] } },
+    });
+  });
+
+  it('should log the rename action', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await handleAccountsRename({
+      service: 'github',
+      oldName: 'oldacct',
+      newName: 'newacct',
+    });
+
+    expect(mockLogInfo).toHaveBeenCalledWith('accounts.rename', {
+      service: 'github',
+      oldName: 'oldacct',
+      newName: 'newacct',
     });
   });
 });

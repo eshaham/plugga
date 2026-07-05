@@ -1,10 +1,3 @@
-import {
-  getDefaultAccount,
-  loadAccountsConfig,
-  saveAccountsConfig,
-  setDefaultAccount,
-  unsetDefaultAccount,
-} from '~/config/accounts';
 import { renameMcpEntry } from '~/config/claude-json';
 import { loadProjectsRegistry } from '~/config/projects-registry';
 import { logInfo } from '~/logging/logger';
@@ -12,12 +5,11 @@ import { errorMessage, printJson, printJsonError } from '~/output';
 import { loadRecipe } from '~/recipes/recipe-loader';
 import type { SecretsStore } from '~/secrets/types';
 
-import { getRecipeAccounts, loadProjectState } from './project-state';
-
-interface AccountsSetDefaultInput {
-  service: string;
-  account: string;
-}
+import {
+  getRecipeAccounts,
+  loadProjectState,
+  saveProjectState,
+} from './project-state';
 
 interface AccountsRenameInput {
   service: string;
@@ -25,14 +17,16 @@ interface AccountsRenameInput {
   newName: string;
 }
 
-async function renameMcpEntriesAcrossProjects(
+async function renameAccountAcrossProjects(
   service: string,
-  oldDefault: string | undefined,
-  newDefault: string | undefined
+  oldName: string,
+  newName: string
 ): Promise<void> {
   const registry = await loadProjectsRegistry();
   for (const [projectDir, recipeNames] of Object.entries(registry)) {
     const state = await loadProjectState(projectDir);
+    let stateChanged = false;
+
     for (const recipeName of recipeNames) {
       let recipe: Awaited<ReturnType<typeof loadRecipe>>;
       try {
@@ -40,98 +34,54 @@ async function renameMcpEntriesAcrossProjects(
       } catch {
         continue;
       }
-      if (recipe.service !== service || recipe.type !== 'mcp') {
+      if (recipe.service !== service) {
         continue;
       }
 
       const accounts = getRecipeAccounts(state, recipeName);
+      if (!accounts.includes(oldName)) {
+        continue;
+      }
 
-      if (oldDefault && accounts.includes(oldDefault)) {
+      if (recipe.type === 'mcp') {
         await renameMcpEntry(
           projectDir,
-          recipe.name,
-          `${recipe.name}-${oldDefault}`
+          `${recipe.name}-${oldName}`,
+          `${recipe.name}-${newName}`
         );
       }
 
-      if (newDefault && accounts.includes(newDefault)) {
-        await renameMcpEntry(
-          projectDir,
-          `${recipe.name}-${newDefault}`,
-          recipe.name
-        );
-      }
+      const renamed = accounts.map((a) => (a === oldName ? newName : a));
+      state.recipes[recipeName] = {
+        accounts: renamed.filter((a, i, arr) => arr.indexOf(a) === i),
+      };
+      stateChanged = true;
+    }
+
+    if (stateChanged) {
+      await saveProjectState(projectDir, state);
     }
   }
 }
 
-async function handleAccountsSetDefault(
-  input: AccountsSetDefaultInput
-): Promise<void> {
-  const oldDefault = await getDefaultAccount(input.service);
-  await setDefaultAccount(input.service, input.account);
-  await renameMcpEntriesAcrossProjects(
-    input.service,
-    oldDefault,
-    input.account
-  );
-  console.log(
-    `Default account for "${input.service}" set to "${input.account}"`
-  );
-  await logInfo('accounts.set-default', {
-    service: input.service,
-    account: input.account,
-  });
-}
-
-async function handleAccountsUnsetDefault(service: string): Promise<void> {
-  const oldDefault = await getDefaultAccount(service);
-  if (!oldDefault) {
-    console.log(`No default account set for "${service}"`);
-    return;
-  }
-  await unsetDefaultAccount(service);
-  await renameMcpEntriesAcrossProjects(service, oldDefault, undefined);
-  console.log(`Default account for "${service}" unset (was "${oldDefault}")`);
-  await logInfo('accounts.unset-default', { service, oldDefault });
-}
-
 async function handleAccountsRename(input: AccountsRenameInput): Promise<void> {
-  const config = await loadAccountsConfig();
-  const currentDefault = config.defaults[input.service];
-
-  if (currentDefault === input.oldName) {
-    config.defaults[input.service] = input.newName;
-    await saveAccountsConfig(config);
-  }
+  await renameAccountAcrossProjects(
+    input.service,
+    input.oldName,
+    input.newName
+  );
 
   console.log(
     `Renamed account "${input.oldName}" to "${input.newName}" for "${input.service}"`
   );
   console.log(
-    'Note: You will need to re-set secrets for the new account name in your secrets store.'
+    'Note: 1Password secrets are stored under the old account name. Re-create them for the new name with "plugga secrets set", then re-run "plugga setup" for any skill recipes.'
   );
   await logInfo('accounts.rename', {
     service: input.service,
     oldName: input.oldName,
     newName: input.newName,
   });
-}
-
-async function handleAccountsShow(
-  service: string,
-  options: { json?: boolean } = {}
-): Promise<void> {
-  const defaultAccount = await getDefaultAccount(service);
-  if (options.json) {
-    printJson({ service, default: defaultAccount ?? null });
-    return;
-  }
-  if (defaultAccount) {
-    console.log(`Default account for "${service}": ${defaultAccount}`);
-  } else {
-    console.log(`No default account set for "${service}"`);
-  }
 }
 
 async function handleAccountsList(
@@ -141,14 +91,10 @@ async function handleAccountsList(
 ): Promise<void> {
   try {
     const accounts = await store.listAccounts(service);
-    const defaultAccount = await getDefaultAccount(service);
     if (options.json) {
       printJson({
         service,
-        accounts: accounts.map((account) => ({
-          name: account,
-          default: account === defaultAccount,
-        })),
+        accounts: accounts.map((account) => ({ name: account })),
       });
       return;
     }
@@ -158,8 +104,7 @@ async function handleAccountsList(
     }
     console.log(`Accounts for ${service}:`);
     for (const account of accounts) {
-      const isDefault = account === defaultAccount;
-      console.log(`  ${account}${isDefault ? ' (default)' : ''}`);
+      console.log(`  ${account}`);
     }
   } catch (error) {
     const message = `Failed to list accounts: ${errorMessage(error)}`;
@@ -171,11 +116,5 @@ async function handleAccountsList(
   }
 }
 
-export {
-  handleAccountsList,
-  handleAccountsRename,
-  handleAccountsSetDefault,
-  handleAccountsShow,
-  handleAccountsUnsetDefault,
-};
-export type { AccountsRenameInput, AccountsSetDefaultInput };
+export { handleAccountsList, handleAccountsRename };
+export type { AccountsRenameInput };

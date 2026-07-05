@@ -13,10 +13,6 @@ import type { McpRecipe, SkillRecipe } from '~/recipes/types';
 
 import { cleanupTempDir, createMockStore, createTempDir } from './test-helpers';
 
-const mockResolveAccount =
-  jest.fn<(service: string, account: string | undefined) => Promise<string>>();
-const mockGetDefaultAccount =
-  jest.fn<(service: string) => Promise<string | undefined>>();
 const mockLoadRecipe =
   jest.fn<(name: string) => Promise<McpRecipe | SkillRecipe>>();
 const mockLoadSkillContent =
@@ -46,11 +42,6 @@ const mockGetVariablesForAccount =
     (service: string, account: string) => Promise<Record<string, string>>
   >();
 const mockHomedir = jest.fn<() => string>();
-
-jest.unstable_mockModule('~/config/accounts', () => ({
-  resolveAccount: mockResolveAccount,
-  getDefaultAccount: mockGetDefaultAccount,
-}));
 
 jest.unstable_mockModule('~/recipes/recipe-loader', () => ({
   loadRecipe: mockLoadRecipe,
@@ -85,7 +76,6 @@ beforeEach(async () => {
   await mkdir(homeDir, { recursive: true });
   mockHomedir.mockReturnValue(homeDir);
   mockGetVariablesForAccount.mockResolvedValue({});
-  mockGetDefaultAccount.mockResolvedValue('myaccount');
   mockLogInfo.mockResolvedValue(undefined);
   mockLogError.mockResolvedValue(undefined);
   mockExec.mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 });
@@ -190,14 +180,16 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       await initClaudeJson(tempDir);
 
-      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-mcp', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       const mcpServers = await readClaudeJsonMcpServers(tempDir);
-      expect(mcpServers['test-mcp']).toEqual({
+      expect(mcpServers['test-mcp-myaccount']).toEqual({
         command: 'npx',
         args: ['@test/server'],
         env: { GITHUB_TOKEN: 'secret123' },
@@ -211,10 +203,12 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
 
-      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-mcp', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('~/.claude.json not found')
@@ -228,7 +222,6 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       await writeFile(
         resolve(homeDir, '.claude.json'),
@@ -236,7 +229,10 @@ describe('handleSetup', () => {
         'utf-8'
       );
 
-      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-mcp', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('not found in ~/.claude.json')
@@ -249,14 +245,16 @@ describe('handleSetup', () => {
       const recipe = makeSseRecipe();
       const store = createMockStore({ 'github/myaccount/api-key': 'mytoken' });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       await initClaudeJson(tempDir);
 
-      await handleSetup({ recipe: 'test-sse', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-sse', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       const mcpServers = await readClaudeJsonMcpServers(tempDir);
-      expect(mcpServers['test-sse']).toEqual({
+      expect(mcpServers['test-sse-myaccount']).toEqual({
         url: 'https://example.com/sse',
         headers: { Authorization: 'Bearer mytoken' },
       });
@@ -268,14 +266,16 @@ describe('handleSetup', () => {
       const recipe = makeHttpRecipe();
       const store = createMockStore({ 'github/myaccount/api-key': 'mytoken' });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       await initClaudeJson(tempDir);
 
-      await handleSetup({ recipe: 'test-http', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-http', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       const mcpServers = await readClaudeJsonMcpServers(tempDir);
-      expect(mcpServers['test-http']).toEqual({
+      expect(mcpServers['test-http-myaccount']).toEqual({
         type: 'http',
         url: 'https://example.com/mcp',
         headers: {
@@ -293,11 +293,13 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# My Skill\nDo stuff.');
 
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-skill', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       const skillContent = await readFile(
         resolve(tempDir, '.claude', 'skills', 'test-skill', 'SKILL.md'),
@@ -314,12 +316,14 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# My Skill');
       mockGetVariablesForAccount.mockResolvedValue({ org: 'my-org' });
 
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-skill', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       const contextContent = await readFile(
         resolve(tempDir, '.claude', 'skills', 'test-skill', 'context.md'),
@@ -336,11 +340,13 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# My Skill');
 
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-skill', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       const settings = await readSettings();
       const env = settings['env'] as Record<string, string>;
@@ -349,47 +355,28 @@ describe('handleSetup', () => {
   });
 
   describe('multi-account MCP setup', () => {
-    it('should use suffixed names when no default account is set', async () => {
+    it('should use suffixed names for each account', async () => {
       const recipe = makeStdioRecipe();
       const store = createMockStore({
         'github/acct1/api-key': 'secret1',
         'github/acct2/api-key': 'secret2',
       });
 
-      mockGetDefaultAccount.mockResolvedValue(undefined);
-      mockResolveAccount.mockResolvedValue('acct1');
       mockLoadRecipe.mockResolvedValue(recipe);
       await initClaudeJson(tempDir);
-      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-mcp', account: 'acct1', projectDir: tempDir },
+        store
+      );
 
-      mockResolveAccount.mockResolvedValue('acct2');
-      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-mcp', account: 'acct2', projectDir: tempDir },
+        store
+      );
 
       const mcpServers = await readClaudeJsonMcpServers(tempDir);
       expect(mcpServers['test-mcp']).toBeUndefined();
       expect(mcpServers['test-mcp-acct1']).toBeDefined();
-      expect(mcpServers['test-mcp-acct2']).toBeDefined();
-    });
-
-    it('should use plain name for default account and suffixed for others', async () => {
-      const recipe = makeStdioRecipe();
-      const store = createMockStore({
-        'github/acct1/api-key': 'secret1',
-        'github/acct2/api-key': 'secret2',
-      });
-
-      mockGetDefaultAccount.mockResolvedValue('acct1');
-      mockResolveAccount.mockResolvedValue('acct1');
-      mockLoadRecipe.mockResolvedValue(recipe);
-      await initClaudeJson(tempDir);
-      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
-
-      mockResolveAccount.mockResolvedValue('acct2');
-      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
-
-      const mcpServers = await readClaudeJsonMcpServers(tempDir);
-      expect(mcpServers['test-mcp']).toBeDefined();
-      expect(mcpServers['test-mcp-acct1']).toBeUndefined();
       expect(mcpServers['test-mcp-acct2']).toBeDefined();
     });
   });
@@ -402,13 +389,17 @@ describe('handleSetup', () => {
         'github/acct2/api-key': 'secret2',
       });
 
-      mockResolveAccount.mockResolvedValue('acct1');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# Skill');
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-skill', account: 'acct1', projectDir: tempDir },
+        store
+      );
 
-      mockResolveAccount.mockResolvedValue('acct2');
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-skill', account: 'acct2', projectDir: tempDir },
+        store
+      );
 
       const settings = await readSettings();
       const env = settings['env'] as Record<string, string>;
@@ -425,11 +416,13 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       await initClaudeJson(tempDir);
 
-      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-mcp', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       const state = await readProjectState();
       const recipes = state['recipes'] as Record<
@@ -448,12 +441,14 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# Skill');
       mockExec.mockResolvedValue({ stdout: '', stderr: '', exitCode: 1 });
 
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-skill', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('settings.local.json is not in .gitignore')
@@ -467,12 +462,14 @@ describe('handleSetup', () => {
         'github/myaccount/api-key': 'secret123',
       });
 
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# Skill');
       mockExec.mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 });
 
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-skill', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       const envWarnings = consoleSpy.mock.calls.filter(
         (call) =>
@@ -522,12 +519,15 @@ describe('handleSetup', () => {
       const store = createMockStore({
         'github/myaccount/api-key': 'secret123',
       });
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadRecipe.mockResolvedValue(recipe);
       mockLoadSkillContent.mockResolvedValue('# Skill');
 
       await handleSetup(
-        { recipe: 'test-skill', projectDir: worktreeRoot },
+        {
+          recipe: 'test-skill',
+          account: 'myaccount',
+          projectDir: worktreeRoot,
+        },
         store
       );
 
@@ -556,7 +556,7 @@ describe('handleSetup', () => {
   });
 
   describe('error handling', () => {
-    it('should log error and print message when setup fails', async () => {
+    it('should log error and print message when no account is given', async () => {
       const consoleSpy = jest.spyOn(console, 'error');
       const store = createMockStore();
 
@@ -567,7 +567,6 @@ describe('handleSetup', () => {
         description: 'test',
         mcp: { transport: 'stdio', command: 'echo' },
       } as McpRecipe);
-      mockResolveAccount.mockRejectedValue(new Error('No account specified'));
       mockLogError.mockResolvedValue(undefined);
 
       await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
@@ -586,10 +585,12 @@ describe('handleSetup', () => {
       });
 
       mockLoadRecipe.mockResolvedValue(recipe);
-      mockResolveAccount.mockResolvedValue('myaccount');
       mockLoadSkillContent.mockResolvedValue(undefined);
 
-      await handleSetup({ recipe: 'test-skill', projectDir: tempDir }, store);
+      await handleSetup(
+        { recipe: 'test-skill', account: 'myaccount', projectDir: tempDir },
+        store
+      );
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('SKILL.md is required')
