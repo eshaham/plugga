@@ -5,13 +5,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  handleAccountsList,
-  handleAccountsRename,
-  handleAccountsSetDefault,
-  handleAccountsShow,
-  handleAccountsUnsetDefault,
-} from '~/commands/accounts';
+import { handleAccountsList, handleAccountsRename } from '~/commands/accounts';
 import { handleInit } from '~/commands/init';
 import { handleInstallSkill } from '~/commands/install-skill';
 import { handleLogs } from '~/commands/logs';
@@ -111,7 +105,7 @@ secrets
   .command('get')
   .description('Retrieve secrets for a service and account')
   .requiredOption('--service <service>', 'Service name')
-  .option('--account <account>', 'Account name (uses default if omitted)')
+  .option('--account <account>', 'Account name')
   .option('--name <name>', 'Specific secret name')
   .option('--json', 'Output machine-readable JSON')
   .action((opts) =>
@@ -182,7 +176,7 @@ variables
   .command('get')
   .description('Retrieve variables for a service and account')
   .requiredOption('--service <service>', 'Service name')
-  .option('--account <account>', 'Account name (uses default if omitted)')
+  .option('--account <account>', 'Account name')
   .option('--json', 'Output machine-readable JSON')
   .action((opts) =>
     handleVariablesGet({
@@ -195,7 +189,7 @@ variables
 program
   .command('setup <recipe>')
   .description('Set up a recipe in the current project')
-  .option('--account <account>', 'Account name (uses default if omitted)')
+  .option('--account <account>', 'Account name')
   .option('--project-dir <dir>', 'Project directory', process.cwd())
   .action((recipeName: string, opts) =>
     handleSetup(
@@ -219,26 +213,6 @@ accountsCmd
   .action((service: string, opts) =>
     handleAccountsList(service, store, { json: opts.json as boolean })
   );
-
-accountsCmd
-  .command('show <service>')
-  .description('Show default account for a service')
-  .option('--json', 'Output machine-readable JSON')
-  .action((service: string, opts) =>
-    handleAccountsShow(service, { json: opts.json as boolean })
-  );
-
-accountsCmd
-  .command('set-default <service> <account>')
-  .description('Set the default account for a service')
-  .action((service: string, account: string) =>
-    handleAccountsSetDefault({ service, account })
-  );
-
-accountsCmd
-  .command('unset-default <service>')
-  .description('Remove the default account for a service')
-  .action((service: string) => handleAccountsUnsetDefault(service));
 
 accountsCmd
   .command('rename')

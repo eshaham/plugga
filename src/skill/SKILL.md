@@ -14,7 +14,7 @@ Plugga is a globally-installed CLI that manages service integrations and secrets
 - **Secrets** — Sensitive values stored in 1Password, scoped to service + account.
 - **Variables** — Non-sensitive config stored locally (~/.config/plugga/variables.json), scoped to service + account.
 - **Recipes** — Define integrations. Type `mcp` configures MCP servers. Type `skill` installs markdown instructions + provisions credentials.
-- **Accounts** — Named identifiers (e.g., `work`, `acme`). Each service can have a default account.
+- **Accounts** — Named identifiers (e.g., `work`, `acme`) that scope secrets and variables within a service.
 
 ## CLI Commands
 
@@ -42,13 +42,13 @@ plugga recipes add <name> --type <mcp|skill> [--service <service>] --description
 plugga recipes show <name> [--json]
 ```
 
-> **Reading values programmatically:** the read commands (`recipes list`, `recipes show`, `secrets get`, `variables get`, `accounts list`, `accounts show`) accept a `--json` flag that emits a single machine-readable JSON object instead of human text. **Always pass `--json` when you need to extract a value** — parse the JSON rather than splitting `key: value` lines, since secret values can contain colons, spaces, or newlines. On failure, `--json` emits `{ "error": "..." }`.
+> **Reading values programmatically:** the read commands (`recipes list`, `recipes show`, `secrets get`, `variables get`, `accounts list`) accept a `--json` flag that emits a single machine-readable JSON object instead of human text. **Always pass `--json` when you need to extract a value** — parse the JSON rather than splitting `key: value` lines, since secret values can contain colons, spaces, or newlines. On failure, `--json` emits `{ "error": "..." }`.
 
 ### Manage Secrets
 
 ```bash
 plugga secrets set --service <s> --account <a> --name <n> --value <v>
-plugga secrets get --service <s> [--account <a>] [--name <n>] [--json]
+plugga secrets get --service <s> --account <a> [--name <n>] [--json]
 plugga secrets delete --service <s> --account <a> --name <n>
 plugga secrets delete-account --service <s> --account <a>
 ```
@@ -61,7 +61,7 @@ Secrets are stored in 1Password as concealed fields within items named `<service
 
 ```bash
 plugga variables set --service <s> --account <a> --name <n> --value <v>
-plugga variables get --service <s> [--account <a>] [--json]
+plugga variables get --service <s> --account <a> [--json]
 ```
 
 Variables are non-sensitive configuration stored locally (not in 1Password).
@@ -70,18 +70,15 @@ Variables are non-sensitive configuration stored locally (not in 1Password).
 
 ```bash
 plugga accounts list <service> [--json]
-plugga accounts show <service> [--json]
-plugga accounts set-default <service> <account>
-plugga accounts unset-default <service>
 plugga accounts rename --service <s> --old-name <o> --new-name <n>
 ```
 
-`set-default` and `unset-default` automatically rename MCP server entries across all registered projects to reflect the new default.
+`rename` updates MCP server entries and per-project setup state across all registered projects. 1Password secrets are keyed by account name, so re-create them for the new name with `plugga secrets set`, then re-run `plugga setup` for any skill recipes.
 
 ### Set Up a Recipe in a Project
 
 ```bash
-plugga setup <recipe> [--account <a>] [--project-dir <d>]
+plugga setup <recipe> --account <a> [--project-dir <d>]
 ```
 
 ### View Logs
@@ -168,7 +165,7 @@ Note: `service` is only needed when it differs from the recipe name (here `my-se
 
 ### MCP Setup
 
-1. Resolves the account (explicit or default for the service).
+1. Requires an explicit `--account`.
 2. Fetches secrets from 1Password.
 3. Writes a server entry to `~/.claude.json` under `projects["<projectDir>"].mcpServers`.
    - stdio: `{ command, args, env }` with secrets as env vars.
@@ -179,7 +176,7 @@ Note: `service` is only needed when it differs from the recipe name (here `my-se
 
 ### Skill Setup
 
-1. Resolves the account.
+1. Requires an explicit `--account`.
 2. Checks if the CLI tool is installed (prints install hint if missing).
 3. Copies `SKILL.md` to `.claude/skills/<recipe>/SKILL.md`.
 4. Generates `.claude/skills/<recipe>/context.md` with account, variables, and secret env var mappings.
@@ -188,18 +185,13 @@ Note: `service` is only needed when it differs from the recipe name (here `my-se
 
 ### MCP Server Naming
 
-The MCP server entry name depends on whether the account is the service default:
-
-- Default account → `<recipe>` (e.g., `linear`)
-- Non-default account → `<recipe>-<account>` (e.g., `linear-acme`)
-
-If no default is set, all accounts get the suffixed form.
+The MCP server entry name is always the recipe name suffixed with the account: `<recipe>-<account>` (e.g., `linear-acme`).
 
 ### Multi-Account Setup
 
 Running setup again with a different `--account` is additive:
 
-- **MCP**: Creates a separate server entry using the naming rules above.
+- **MCP**: Creates a separate server entry named `<recipe>-<account>`.
 - **Skill context.md**: Regenerated with per-account sections for all configured accounts.
 - **Skill env vars**: Single account uses clean names (`MY_API_KEY`). Multiple accounts suffix all (`MY_API_KEY_PERSONAL`, `MY_API_KEY_ACME`).
 
@@ -227,7 +219,7 @@ The only files you should edit directly are:
 - For skill recipes, you MUST create a `SKILL.md` file at `~/.config/plugga/recipes/<name>/SKILL.md`. This is required — `plugga setup` will fail without it.
 - Services are shared namespaces. Multiple recipes can reference the same service (e.g., an MCP recipe and a skill recipe for the same tool can share credentials by using the same `service` value).
 - Always confirm the account name with the user before running setup or storing secrets. Run `plugga accounts list <service>` first — if accounts exist, present them and ask whether to use an existing one or create a new one. Never infer the account name from context. Suggest a name based on available context, but let the user confirm or change it.
-- After confirming the account, ask the user whether they want it set as the default for that service (`plugga accounts set-default <service> <account>`). Explain that the default affects MCP server naming: the default account gets the plain recipe name (e.g., `linear`), others get a suffix (e.g., `linear-acme`).
+- `--account` is required for setup, `secrets get`, and `variables get`. The account also determines the MCP server entry name, which is always `<recipe>-<account>` (e.g., `linear-acme`).
 - The `--service` flag defaults to the recipe name, so omit it unless the service name differs from the recipe name (e.g., when two recipes share one service).
 - Secrets are set one at a time: `plugga secrets set --service <s> --account <a> --name <n> --value <v>`.
 - If a setup fails due to a missing secret, guide the user to set it first with `plugga secrets set`.
@@ -270,7 +262,6 @@ See: https://github.com/example/my-tool#readme
 ## File Locations
 
 - Config: `~/.config/plugga/config.json` (profiles, tag)
-- Accounts: `~/.config/plugga/accounts.json` (default account per service)
 - Variables: `~/.config/plugga/variables.json` (non-sensitive config)
 - Recipes: `~/.config/plugga/recipes/<name>/` (recipe.json + optional SKILL.md)
 - Logs: `~/.config/plugga/logs/plugga.log`

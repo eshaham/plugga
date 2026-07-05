@@ -40,8 +40,7 @@ async function handleVariablesSet(input: VariablesSetInput): Promise<void> {
 
 async function handleVariablesGet(input: VariablesGetInput): Promise<void> {
   if (!input.account) {
-    const message =
-      'No account specified. Use --account or set a default with "plugga accounts set-default".';
+    const message = 'No account specified. Use --account.';
     if (input.json) {
       printJsonError(message);
     } else {
