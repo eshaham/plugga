@@ -1,7 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { readClaudeJson, writeClaudeJson } from '~/config/claude-json';
+import {
+  getProjectMcpServers,
+  readClaudeJson,
+  setProjectMcpServers,
+  writeClaudeJson,
+} from '~/config/claude-json';
 import { registerProject } from '~/config/projects-registry';
 import { getVariablesForAccount } from '~/config/variables';
 import { exec } from '~/exec/runner';
@@ -19,16 +24,17 @@ import type { McpRecipe, Recipe, SkillRecipe } from '~/recipes/types';
 import type { SecretsStore } from '~/secrets/types';
 
 import {
-  addRecipeAccount,
   getRecipeAccounts,
   loadProjectState,
   saveProjectState,
+  setRecipeAccounts,
 } from './project-state';
 
 interface SetupInput {
   recipe: string;
   account?: string;
   projectDir: string;
+  add?: boolean;
 }
 
 async function resolveSecrets(
@@ -333,6 +339,67 @@ async function ensureWorktreeInclude(mainRoot: string): Promise<void> {
   }
 }
 
+async function removeMcpAccounts(
+  recipe: McpRecipe,
+  accounts: string[],
+  projectDir: string
+): Promise<void> {
+  if (accounts.length === 0) {
+    return;
+  }
+  const mcpServers = await getProjectMcpServers(projectDir);
+  let changed = false;
+  for (const account of accounts) {
+    const serverName = `${recipe.name}-${account}`;
+    if (serverName in mcpServers) {
+      delete mcpServers[serverName];
+      changed = true;
+      console.log(`Removed MCP server "${serverName}" from ~/.claude.json`);
+    }
+  }
+  if (changed) {
+    await setProjectMcpServers(projectDir, mcpServers);
+  }
+}
+
+async function removeSkillAccountsEnv(
+  recipe: SkillRecipe,
+  accounts: string[],
+  projectDir: string
+): Promise<void> {
+  if (accounts.length === 0) {
+    return;
+  }
+  const settingsPath = resolve(projectDir, '.claude', 'settings.local.json');
+  const settings = await readJsonFile(settingsPath);
+  const env = (settings['env'] as Record<string, string>) ?? {};
+  let changed = false;
+  for (const account of accounts) {
+    for (const secret of recipe.secrets ?? []) {
+      if (!secret.envVar) {
+        continue;
+      }
+      for (const key of [secret.envVar, suffixEnvVar(secret.envVar, account)]) {
+        if (env[key] !== undefined) {
+          delete env[key];
+          changed = true;
+        }
+      }
+    }
+  }
+  if (changed) {
+    settings['env'] = env;
+    await writeFile(
+      settingsPath,
+      JSON.stringify(settings, null, 2) + '\n',
+      'utf-8'
+    );
+    console.log(
+      `Removed env vars for replaced account(s): ${accounts.join(', ')}`
+    );
+  }
+}
+
 async function handleSetup(
   input: SetupInput,
   store: SecretsStore
@@ -358,20 +425,33 @@ async function handleSetup(
 
     const state = await loadProjectState(setupDir);
     const existingAccounts = getRecipeAccounts(state, input.recipe);
+    const otherAccounts = existingAccounts.filter((a) => a !== account);
+    const isAdd = input.add ?? false;
+    const accountsToRemove = isAdd ? [] : otherAccounts;
+    const remainingAccounts = isAdd ? otherAccounts : [];
 
-    if (existingAccounts.includes(account)) {
+    if (accountsToRemove.length > 0) {
+      console.log(
+        `Switching ${input.recipe} to account "${account}" (removing ${accountsToRemove.join(
+          ', '
+        )}). Use --add to keep multiple accounts.`
+      );
+    } else if (existingAccounts.includes(account)) {
       console.log(
         `Re-running setup for ${input.recipe}/${account} (updating existing configuration)`
       );
     }
 
     if (recipe.type === 'mcp') {
+      await removeMcpAccounts(recipe, accountsToRemove, input.projectDir);
       await setupMcp(recipe, secrets, account, input.projectDir);
     } else if (recipe.type === 'skill') {
-      await setupSkill(recipe, secrets, account, existingAccounts, setupDir);
+      await removeSkillAccountsEnv(recipe, accountsToRemove, setupDir);
+      await setupSkill(recipe, secrets, account, remainingAccounts, setupDir);
     }
 
-    const updatedState = addRecipeAccount(state, input.recipe, account);
+    const finalAccounts = isAdd ? [...existingAccounts, account] : [account];
+    const updatedState = setRecipeAccounts(state, input.recipe, finalAccounts);
     await saveProjectState(setupDir, updatedState);
     await registerProject(setupDir, input.recipe);
 
