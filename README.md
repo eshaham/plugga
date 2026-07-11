@@ -84,7 +84,7 @@ plugga accounts rename \
 ### Setup
 
 ```bash
-plugga setup <recipe> --account <a> [--project-dir <d>]
+plugga setup <recipe> --account <a> [--add] [--project-dir <d>]
 ```
 
 Sets up a recipe in the current project:
@@ -107,11 +107,20 @@ Sets up a recipe in the current project:
 
 **MCP server naming**: The entry name is always the recipe name suffixed with the account: `<recipe>-<account>` (e.g., `linear-acme`).
 
-**Multi-account setup**: Running setup again with a different `--account` adds to existing configuration:
+**Switching accounts (default)**: Running setup again with a different `--account` replaces the previously configured account(s) for that recipe — the repo ends up pointing at exactly the account you named:
+
+- MCP: the old `<recipe>-<account>` server entry is removed and replaced with the new one
+- Skill env vars and context.md: the old account's env vars are removed and regenerated for the new account
+
+Use this to switch between accounts of the same service in a repo.
+
+**Multi-account setup**: Pass `--add` to keep the existing accounts and configure another alongside them:
 
 - MCP: creates a separate server entry named `<recipe>-<account>`
 - Skill context.md: regenerated listing all configured accounts with per-account sections
 - Skill env vars: single account uses clean names (`MY_API_KEY`), multi-account suffixes all (`MY_API_KEY_PERSONAL`, `MY_API_KEY_ACME`)
+
+Without `--add`, re-running setup for a service always collapses it to the single account you named.
 
 Setup state is tracked in `.claude/plugga.json` per project.
 

@@ -51,10 +51,26 @@ function addRecipeAccount(
   };
 }
 
+function setRecipeAccounts(
+  state: ProjectState,
+  recipeName: string,
+  accounts: string[]
+): ProjectState {
+  const deduped = accounts.filter((a, i, arr) => arr.indexOf(a) === i);
+  return {
+    ...state,
+    recipes: {
+      ...state.recipes,
+      [recipeName]: { accounts: deduped },
+    },
+  };
+}
+
 export {
   addRecipeAccount,
   getRecipeAccounts,
   loadProjectState,
   saveProjectState,
+  setRecipeAccounts,
 };
 export type { ProjectState, RecipeState };

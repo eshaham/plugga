@@ -190,6 +190,10 @@ program
   .command('setup <recipe>')
   .description('Set up a recipe in the current project')
   .option('--account <account>', 'Account name')
+  .option(
+    '--add',
+    'Keep existing accounts for this service instead of replacing them'
+  )
   .option('--project-dir <dir>', 'Project directory', process.cwd())
   .action((recipeName: string, opts) =>
     handleSetup(
@@ -197,6 +201,7 @@ program
         recipe: recipeName,
         account: opts.account as string | undefined,
         projectDir: opts.projectDir as string,
+        add: opts.add as boolean | undefined,
       },
       store
     )

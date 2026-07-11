@@ -370,7 +370,12 @@ describe('handleSetup', () => {
       );
 
       await handleSetup(
-        { recipe: 'test-mcp', account: 'acct2', projectDir: tempDir },
+        {
+          recipe: 'test-mcp',
+          account: 'acct2',
+          projectDir: tempDir,
+          add: true,
+        },
         store
       );
 
@@ -397,7 +402,12 @@ describe('handleSetup', () => {
       );
 
       await handleSetup(
-        { recipe: 'test-skill', account: 'acct2', projectDir: tempDir },
+        {
+          recipe: 'test-skill',
+          account: 'acct2',
+          projectDir: tempDir,
+          add: true,
+        },
         store
       );
 
@@ -406,6 +416,114 @@ describe('handleSetup', () => {
       expect(env['GITHUB_TOKEN_ACCT1']).toBe('secret1');
       expect(env['GITHUB_TOKEN_ACCT2']).toBe('secret2');
       expect(env['GITHUB_TOKEN']).toBeUndefined();
+    });
+  });
+
+  describe('switching accounts (replace by default)', () => {
+    it('replaces the MCP server for the previous account', async () => {
+      const recipe = makeStdioRecipe();
+      const store = createMockStore({
+        'github/acct1/api-key': 'secret1',
+        'github/acct2/api-key': 'secret2',
+      });
+
+      mockLoadRecipe.mockResolvedValue(recipe);
+      await initClaudeJson(tempDir);
+      await handleSetup(
+        { recipe: 'test-mcp', account: 'acct1', projectDir: tempDir },
+        store
+      );
+
+      await handleSetup(
+        { recipe: 'test-mcp', account: 'acct2', projectDir: tempDir },
+        store
+      );
+
+      const mcpServers = await readClaudeJsonMcpServers(tempDir);
+      expect(mcpServers['test-mcp-acct1']).toBeUndefined();
+      expect(mcpServers['test-mcp-acct2']).toBeDefined();
+
+      const state = await readProjectState();
+      const recipes = state['recipes'] as Record<
+        string,
+        { accounts: string[] }
+      >;
+      expect(recipes['test-mcp']?.accounts).toEqual(['acct2']);
+    });
+
+    it('replaces the skill env var for the previous account', async () => {
+      const recipe = makeSkillRecipe();
+      const store = createMockStore({
+        'github/acct1/api-key': 'secret1',
+        'github/acct2/api-key': 'secret2',
+      });
+
+      mockLoadRecipe.mockResolvedValue(recipe);
+      mockLoadSkillContent.mockResolvedValue('# Skill');
+      await handleSetup(
+        { recipe: 'test-skill', account: 'acct1', projectDir: tempDir },
+        store
+      );
+
+      await handleSetup(
+        { recipe: 'test-skill', account: 'acct2', projectDir: tempDir },
+        store
+      );
+
+      const settings = await readSettings();
+      const env = settings['env'] as Record<string, string>;
+      expect(env['GITHUB_TOKEN']).toBe('secret2');
+      expect(env['GITHUB_TOKEN_ACCT1']).toBeUndefined();
+
+      const contextContent = await readFile(
+        resolve(tempDir, '.claude', 'skills', 'test-skill', 'context.md'),
+        'utf-8'
+      );
+      expect(contextContent).toContain('Account: acct2');
+      expect(contextContent).not.toContain('acct1');
+    });
+
+    it('collapses a multi-account skill to a single account when switching', async () => {
+      const recipe = makeSkillRecipe();
+      const store = createMockStore({
+        'github/acct1/api-key': 'secret1',
+        'github/acct2/api-key': 'secret2',
+        'github/acct3/api-key': 'secret3',
+      });
+
+      mockLoadRecipe.mockResolvedValue(recipe);
+      mockLoadSkillContent.mockResolvedValue('# Skill');
+      await handleSetup(
+        { recipe: 'test-skill', account: 'acct1', projectDir: tempDir },
+        store
+      );
+      await handleSetup(
+        {
+          recipe: 'test-skill',
+          account: 'acct2',
+          projectDir: tempDir,
+          add: true,
+        },
+        store
+      );
+
+      await handleSetup(
+        { recipe: 'test-skill', account: 'acct3', projectDir: tempDir },
+        store
+      );
+
+      const settings = await readSettings();
+      const env = settings['env'] as Record<string, string>;
+      expect(env['GITHUB_TOKEN']).toBe('secret3');
+      expect(env['GITHUB_TOKEN_ACCT1']).toBeUndefined();
+      expect(env['GITHUB_TOKEN_ACCT2']).toBeUndefined();
+
+      const state = await readProjectState();
+      const recipes = state['recipes'] as Record<
+        string,
+        { accounts: string[] }
+      >;
+      expect(recipes['test-skill']?.accounts).toEqual(['acct3']);
     });
   });
 
