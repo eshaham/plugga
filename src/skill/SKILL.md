@@ -7,6 +7,20 @@ description: Manage service integrations and secrets across projects using plugg
 
 Plugga is a globally-installed CLI that manages service integrations and secrets across projects. It configures MCP servers and skills with credentials stored in 1Password.
 
+## Scope: What Plugga Is For
+
+Plugga exists so tools running **inside a Claude Code session** — MCP servers, CLI recipes, skill integrations — can authenticate to a service. It is not a general-purpose password manager.
+
+**Refuse the request (don't run `plugga secrets set`) when:**
+
+- The value isn't tied to a recipe (MCP or skill) that something in a Claude Code session will actually read and use.
+- The user just wants to store a personal/manual credential — a website login, WiFi password, personal account password — with no automation or tool consuming it.
+- There's no service/recipe context at all — just an arbitrary named secret with nothing to configure.
+
+If a request looks like plain password storage rather than a service integration, say Plugga isn't the right tool for it and point the user to their password manager (e.g., 1Password directly) instead.
+
+A legitimate request looks like: "set up the Linear MCP," "add an API key for this CLI tool," "configure credentials for this recipe" — something a recipe will consume programmatically.
+
 ## Concepts
 
 - **Profiles** — Map to a 1Password account + vault. Configured during `plugga init`.
