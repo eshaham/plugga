@@ -59,6 +59,7 @@ jest.unstable_mockModule('~/logging/logger', () => ({
 
 jest.unstable_mockModule('~/config/variables', () => ({
   getVariablesForAccount: mockGetVariablesForAccount,
+  loadVariables: () => Promise.resolve({}),
 }));
 
 jest.unstable_mockModule('node:os', () => ({
@@ -173,6 +174,39 @@ async function readProjectState(): Promise<Record<string, unknown>> {
 }
 
 describe('handleSetup', () => {
+  describe('account resolution', () => {
+    it('uses the only account when --account is omitted', async () => {
+      const store = createMockStore({ 'github/solo/api-key': 'secret' });
+      mockLoadRecipe.mockResolvedValue(makeStdioRecipe());
+      await initClaudeJson(tempDir);
+
+      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+
+      const mcpServers = await readClaudeJsonMcpServers(tempDir);
+      expect(Object.keys(mcpServers)).toEqual(['test-mcp-solo']);
+    });
+
+    it('fails and lists accounts when several exist', async () => {
+      const errorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const store = createMockStore({
+        'github/acct1/api-key': 'a',
+        'github/acct2/api-key': 'b',
+      });
+      mockLoadRecipe.mockResolvedValue(makeStdioRecipe());
+      await initClaudeJson(tempDir);
+
+      await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('multiple accounts (acct1, acct2)')
+      );
+      expect(await readClaudeJsonMcpServers(tempDir)).toEqual({});
+      errorSpy.mockRestore();
+    });
+  });
+
   describe('MCP stdio setup', () => {
     it('should write correct entry to ~/.claude.json', async () => {
       const recipe = makeStdioRecipe();
@@ -674,7 +708,7 @@ describe('handleSetup', () => {
   });
 
   describe('error handling', () => {
-    it('should log error and print message when no account is given', async () => {
+    it('should log error and print message when the service has no accounts', async () => {
       const consoleSpy = jest.spyOn(console, 'error');
       const store = createMockStore();
 
@@ -690,7 +724,7 @@ describe('handleSetup', () => {
       await handleSetup({ recipe: 'test-mcp', projectDir: tempDir }, store);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No account specified')
+        expect.stringContaining('No accounts found')
       );
       expect(mockLogError).toHaveBeenCalled();
     });
