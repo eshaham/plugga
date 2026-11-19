@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import { resolveAccount } from '~/config/account-resolution';
 import {
   getProjectMcpServers,
   readClaudeJson,
@@ -406,10 +407,7 @@ async function handleSetup(
 ): Promise<void> {
   try {
     const recipe = await loadRecipe(input.recipe);
-    const account = input.account;
-    if (!account) {
-      throw new Error('No account specified. Use --account.');
-    }
+    const account = await resolveAccount(recipe.service, input.account, store);
     const secrets = await resolveSecrets(recipe, account, store);
 
     const worktree =

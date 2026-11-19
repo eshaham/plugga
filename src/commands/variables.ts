@@ -1,6 +1,8 @@
+import { resolveAccount } from '~/config/account-resolution';
 import { getVariablesForAccount, setVariable } from '~/config/variables';
 import { logError, logInfo } from '~/logging/logger';
 import { errorMessage, printJson, printJsonError } from '~/output';
+import type { SecretsStore } from '~/secrets/types';
 
 interface VariablesSetInput {
   service: string;
@@ -38,32 +40,36 @@ async function handleVariablesSet(input: VariablesSetInput): Promise<void> {
   }
 }
 
-async function handleVariablesGet(input: VariablesGetInput): Promise<void> {
-  if (!input.account) {
-    const message = 'No account specified. Use --account.';
+async function handleVariablesGet(
+  input: VariablesGetInput,
+  store: SecretsStore
+): Promise<void> {
+  let account: string;
+  try {
+    account = await resolveAccount(input.service, input.account, store);
+  } catch (error) {
+    const message = errorMessage(error);
     if (input.json) {
       printJsonError(message);
     } else {
       console.error(message);
     }
+    process.exitCode = 1;
     return;
   }
 
   try {
-    const variables = await getVariablesForAccount(
-      input.service,
-      input.account
-    );
+    const variables = await getVariablesForAccount(input.service, account);
     const entries = Object.entries(variables);
 
     if (input.json) {
       printJson({
         service: input.service,
-        account: input.account,
+        account,
         variables,
       });
     } else if (entries.length === 0) {
-      console.log(`No variables set for ${input.service}/${input.account}`);
+      console.log(`No variables set for ${input.service}/${account}`);
     } else {
       for (const [name, value] of entries) {
         console.log(`${name}: ${value}`);
@@ -71,12 +77,12 @@ async function handleVariablesGet(input: VariablesGetInput): Promise<void> {
     }
     await logInfo('variables.get', {
       service: input.service,
-      account: input.account,
+      account,
     });
   } catch (error) {
     await logError('variables.get', error, {
       service: input.service,
-      account: input.account,
+      account,
     });
     const message = `Failed to get variables: ${errorMessage(error)}`;
     if (input.json) {

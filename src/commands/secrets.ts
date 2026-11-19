@@ -1,3 +1,4 @@
+import { resolveAccount } from '~/config/account-resolution';
 import { logError, logInfo } from '~/logging/logger';
 import { errorMessage, printJson, printJsonError } from '~/output';
 import type { SecretsStore } from '~/secrets/types';
@@ -58,9 +59,11 @@ async function handleSecretsGet(
   input: SecretsGetInput,
   store: SecretsStore
 ): Promise<void> {
-  const account = input.account;
-  if (!account) {
-    const message = 'No account specified. Use --account.';
+  let account: string;
+  try {
+    account = await resolveAccount(input.service, input.account, store);
+  } catch (error) {
+    const message = errorMessage(error);
     if (input.json) {
       printJsonError(message);
     } else {

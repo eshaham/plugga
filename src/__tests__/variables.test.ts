@@ -17,7 +17,7 @@ import {
   setVariable,
 } from '~/config/variables';
 
-import { cleanupTempDir, createTempDir } from './test-helpers';
+import { cleanupTempDir, createMockStore, createTempDir } from './test-helpers';
 
 let tempDir: string;
 let originalXdg: string | undefined;
@@ -117,11 +117,14 @@ describe('variables get --json', () => {
     await setVariable('github', 'myaccount', 'repo', 'my-repo');
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
-    await handleVariablesGet({
-      service: 'github',
-      account: 'myaccount',
-      json: true,
-    });
+    await handleVariablesGet(
+      {
+        service: 'github',
+        account: 'myaccount',
+        json: true,
+      },
+      createMockStore()
+    );
 
     expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
       service: 'github',
@@ -133,11 +136,14 @@ describe('variables get --json', () => {
   it('should print empty variables object as JSON', async () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
-    await handleVariablesGet({
-      service: 'github',
-      account: 'empty',
-      json: true,
-    });
+    await handleVariablesGet(
+      {
+        service: 'github',
+        account: 'empty',
+        json: true,
+      },
+      createMockStore()
+    );
 
     expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
       service: 'github',
@@ -151,10 +157,45 @@ describe('variables get --json', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    await handleVariablesGet({ service: 'github', json: true });
+    await handleVariablesGet(
+      { service: 'github', json: true },
+      createMockStore()
+    );
 
     expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
-      error: expect.stringContaining('No account specified'),
+      error: expect.stringContaining('No accounts found'),
+    });
+  });
+
+  it('should use the only account when none is specified', async () => {
+    await setVariable('github', 'myaccount', 'org', 'my-org');
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await handleVariablesGet(
+      { service: 'github', json: true },
+      createMockStore()
+    );
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      service: 'github',
+      account: 'myaccount',
+      variables: { org: 'my-org' },
+    });
+  });
+
+  it('should list accounts when several exist and none is specified', async () => {
+    await setVariable('github', 'myaccount', 'org', 'my-org');
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await handleVariablesGet(
+      { service: 'github', json: true },
+      createMockStore({ 'github/other/api-key': 'x' })
+    );
+
+    expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
+      error: expect.stringContaining('multiple accounts (myaccount, other)'),
     });
   });
 });

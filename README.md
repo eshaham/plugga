@@ -84,7 +84,7 @@ plugga accounts rename \
 ### Setup
 
 ```bash
-plugga setup <recipe> --account <a> [--add] [--project-dir <d>]
+plugga setup <recipe> [--account <a>] [--add] [--project-dir <d>]
 ```
 
 Sets up a recipe in the current project:
@@ -105,9 +105,13 @@ Sets up a recipe in the current project:
 4. Write secrets as environment variables to `.claude/settings.local.json` `env` field (automatically available in shell)
 5. Warn if `settings.local.json` is not in `.gitignore`
 
-**MCP server naming**: The entry name is always the recipe name suffixed with the account: `<recipe>-<account>` (e.g., `linear-acme`).
+**MCP server naming**: The entry name is always the recipe name suffixed with the account: `<recipe>-<account>` (e.g., `linear-acme`), even when the service has a single account.
 
-**Switching accounts (default)**: Running setup again with a different `--account` replaces the previously configured account(s) for that recipe — the repo ends up pointing at exactly the account you named:
+**Account resolution**: There is no default account. Commands that take an optional `--account` (`setup`, `secrets get`, `variables get`) use the account you name. If you omit it and the service has exactly one account (in 1Password or in variables), that account is used; otherwise the command fails and lists the available accounts.
+
+**Skill env var naming**: Env var names depend only on how many accounts the recipe has in this project. With one account, secrets use the recipe's clean names (`MY_API_KEY`). With two or more (via `--add`), every account's vars are suffixed with the upper-cased account name, non-alphanumerics replaced by `_` (`MY_API_KEY_PERSONAL`, `MY_API_KEY_ACME`). `context.md` always lists the exact names in use.
+
+**Switching accounts**: Running setup again with a different `--account` replaces the previously configured account(s) for that recipe — the repo ends up pointing at exactly the account you named:
 
 - MCP: the old `<recipe>-<account>` server entry is removed and replaced with the new one
 - Skill env vars and context.md: the old account's env vars are removed and regenerated for the new account
@@ -118,11 +122,19 @@ Use this to switch between accounts of the same service in a repo.
 
 - MCP: creates a separate server entry named `<recipe>-<account>`
 - Skill context.md: regenerated listing all configured accounts with per-account sections
-- Skill env vars: single account uses clean names (`MY_API_KEY`), multi-account suffixes all (`MY_API_KEY_PERSONAL`, `MY_API_KEY_ACME`)
+- Skill env vars: switch to the suffixed form for every account (see naming above)
 
 Without `--add`, re-running setup for a service always collapses it to the single account you named.
 
 Setup state is tracked in `.claude/plugga.json` per project.
+
+### Migrate
+
+```bash
+plugga migrate
+```
+
+Upgrades machine state from versions that had default accounts: renames bare `<recipe>` MCP entries in `~/.claude.json` to `<recipe>-<account>` across all registered projects (using the old default, or the project's only account), and moves the legacy `~/.config/plugga/accounts.json` aside. Both files are backed up first. Safe to re-run.
 
 ### Logs
 

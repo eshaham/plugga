@@ -9,6 +9,7 @@ import { handleAccountsList, handleAccountsRename } from '~/commands/accounts';
 import { handleInit } from '~/commands/init';
 import { handleInstallSkill } from '~/commands/install-skill';
 import { handleLogs } from '~/commands/logs';
+import { handleMigrate } from '~/commands/migrate';
 import {
   handleRecipesAdd,
   handleRecipesList,
@@ -105,7 +106,10 @@ secrets
   .command('get')
   .description('Retrieve secrets for a service and account')
   .requiredOption('--service <service>', 'Service name')
-  .option('--account <account>', 'Account name')
+  .option(
+    '--account <account>',
+    'Account name (optional when the service has exactly one account)'
+  )
   .option('--name <name>', 'Specific secret name')
   .option('--json', 'Output machine-readable JSON')
   .action((opts) =>
@@ -176,20 +180,29 @@ variables
   .command('get')
   .description('Retrieve variables for a service and account')
   .requiredOption('--service <service>', 'Service name')
-  .option('--account <account>', 'Account name')
+  .option(
+    '--account <account>',
+    'Account name (optional when the service has exactly one account)'
+  )
   .option('--json', 'Output machine-readable JSON')
   .action((opts) =>
-    handleVariablesGet({
-      service: opts.service as string,
-      account: opts.account as string | undefined,
-      json: opts.json as boolean,
-    })
+    handleVariablesGet(
+      {
+        service: opts.service as string,
+        account: opts.account as string | undefined,
+        json: opts.json as boolean,
+      },
+      store
+    )
   );
 
 program
   .command('setup <recipe>')
   .description('Set up a recipe in the current project')
-  .option('--account <account>', 'Account name')
+  .option(
+    '--account <account>',
+    'Account name (optional when the service has exactly one account)'
+  )
   .option(
     '--add',
     'Keep existing accounts for this service instead of replacing them'
@@ -237,6 +250,13 @@ program
   .command('install-skill')
   .description('Install or update the plugga skill globally')
   .action(() => handleInstallSkill());
+
+program
+  .command('migrate')
+  .description(
+    'Remove legacy default accounts and rename bare MCP entries to <recipe>-<account>'
+  )
+  .action(() => handleMigrate());
 
 program
   .command('logs')

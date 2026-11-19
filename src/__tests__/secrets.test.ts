@@ -7,7 +7,7 @@ import {
   jest,
 } from '@jest/globals';
 
-import { createMockStore } from './test-helpers';
+import { cleanupTempDir, createMockStore, createTempDir } from './test-helpers';
 
 const mockLogInfo =
   jest.fn<
@@ -35,17 +35,27 @@ const {
 } = await import('~/commands/secrets');
 
 const originalExitCode = process.exitCode;
+const originalXdg = process.env['XDG_CONFIG_HOME'];
+let tempDir: string;
 
-beforeEach(() => {
+beforeEach(async () => {
+  tempDir = await createTempDir();
+  process.env['XDG_CONFIG_HOME'] = tempDir;
   jest.clearAllMocks();
   mockLogInfo.mockResolvedValue(undefined);
   mockLogError.mockResolvedValue(undefined);
   process.exitCode = 0;
 });
 
-afterEach(() => {
+afterEach(async () => {
   jest.restoreAllMocks();
   process.exitCode = originalExitCode;
+  if (originalXdg === undefined) {
+    delete process.env['XDG_CONFIG_HOME'];
+  } else {
+    process.env['XDG_CONFIG_HOME'] = originalXdg;
+  }
+  await cleanupTempDir(tempDir);
 });
 
 describe('secrets set', () => {
@@ -100,7 +110,34 @@ describe('secrets set', () => {
 });
 
 describe('secrets get', () => {
-  it('should print error when no account specified', async () => {
+  it('should use the only account when none is specified', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const store = createMockStore({ 'github/personal/api-key': 'abc123' });
+
+    await handleSecretsGet({ service: 'github', name: 'api-key' }, store);
+
+    expect(consoleSpy).toHaveBeenCalledWith('api-key: abc123');
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('should list accounts when several exist and none is specified', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const store = createMockStore({
+      'github/personal/api-key': 'a',
+      'github/work/api-key': 'b',
+    });
+
+    await handleSecretsGet({ service: 'github', name: 'api-key' }, store);
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('multiple accounts (personal, work)')
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('should print error when the service has no accounts', async () => {
     const consoleSpy = jest
       .spyOn(console, 'error')
       .mockImplementation(() => {});
@@ -109,7 +146,7 @@ describe('secrets get', () => {
     await handleSecretsGet({ service: 'github' }, store);
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('No account specified')
+      expect.stringContaining('No accounts found')
     );
     expect(process.exitCode).toBe(1);
   });
@@ -179,7 +216,7 @@ describe('secrets get', () => {
     ).toBe(value);
   });
 
-  it('should print error as JSON when no account specified', async () => {
+  it('should print error as JSON when the service has no accounts', async () => {
     const consoleSpy = jest
       .spyOn(console, 'error')
       .mockImplementation(() => {});
@@ -188,7 +225,7 @@ describe('secrets get', () => {
     await handleSecretsGet({ service: 'github', json: true }, store);
 
     expect(JSON.parse(consoleSpy.mock.calls[0]?.[0] as string)).toEqual({
-      error: expect.stringContaining('No account specified'),
+      error: expect.stringContaining('No accounts found'),
     });
   });
 
